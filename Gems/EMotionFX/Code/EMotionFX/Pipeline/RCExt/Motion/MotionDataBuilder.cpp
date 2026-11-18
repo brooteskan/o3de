@@ -56,7 +56,7 @@ namespace EMotionFX
             AZ::SerializeContext* serializeContext = azrtti_cast<AZ::SerializeContext*>(context);
             if (serializeContext)
             {
-                serializeContext->Class<MotionDataBuilder, AZ::SceneAPI::SceneCore::ExportingComponent>()->Version(1);
+                serializeContext->Class<MotionDataBuilder, AZ::SceneAPI::SceneCore::ExportingComponent>()->Version(2);
             }
         }
 
@@ -188,7 +188,33 @@ namespace EMotionFX
                 const SceneDataTypes::IGraphObject* parentNode = sceneGraph.GetNodeContent(parentNodeIndex).get();
                 if (const SceneDataTypes::IBoneData* parentBone = azrtti_cast<const SceneDataTypes::IBoneData*>(parentNode))
                 {
-                    return parentBone->GetWorldTransform().GetInverseFull() * nodeTransform;
+                    const auto parentWorld = parentBone->GetWorldTransform();
+                    // Normalize basis columns before inversion: a valid tiny prop
+                    // scale can put the determinant below GetInverseFull's absolute
+                    // epsilon. Preserve shear and translation, then undo the column
+                    // scaling by scaling the inverse's rows (including translation).
+                    auto normalizedParent = parentWorld;
+                    const AZ::Vector3 scale(
+                        parentWorld.GetColumn(0).GetLength(),
+                        parentWorld.GetColumn(1).GetLength(),
+                        parentWorld.GetColumn(2).GetLength());
+                    if (scale.IsFinite() && scale.GetX() > 0.0f && scale.GetY() > 0.0f && scale.GetZ() > 0.0f)
+                    {
+                        normalizedParent.MultiplyByScale(scale.GetReciprocal());
+                        if (AZ::IsClose(normalizedParent.GetDeterminant3x3(), 0.0f, AZ::Constants::FloatEpsilon))
+                        {
+                            return parentWorld.GetInverseFull() * nodeTransform;
+                        }
+                        auto inverse = normalizedParent.GetInverseFull();
+                        for (int row = 0; row < 3; ++row)
+                        {
+                            inverse.SetRow(row, inverse.GetRow(row) / scale.GetElement(row));
+                        }
+                        return inverse * nodeTransform;
+                    }
+                    // Truly singular or non-finite inputs still produce the
+                    // original diagnostic and fallback rather than being hidden.
+                    return parentWorld.GetInverseFull() * nodeTransform;
                 }
             }
 

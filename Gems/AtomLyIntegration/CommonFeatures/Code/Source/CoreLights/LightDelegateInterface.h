@@ -48,6 +48,7 @@ namespace AZ
             virtual float SetPhotometricUnit(PhotometricUnit unit) = 0;
             //! Sets the maximum distance from any part of the surface of the area light at which this light will have an effect.
             virtual void SetAttenuationRadius(float radius) = 0;
+            virtual void SetFalloffRate(float) {}
             //! Gets the light intensity.
             virtual const PhotometricValue& GetPhotometricValue() const = 0;
             //! Gets the surface area of the shape.

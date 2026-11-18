@@ -64,6 +64,15 @@ namespace AZ
                         ->Attribute(AZ::Edit::Attributes::Min, 0.f)
                         ->Attribute(AZ::Edit::Attributes::Max, 1.f)
 
+                        ->DataElement(AZ::Edit::UIHandlers::ComboBox, &DecalComponentConfig::m_blendMode,
+                            QT_TRANSLATE_NOOP("AtomLyIntegration", "Blend Mode"),
+                            QT_TRANSLATE_NOOP("AtomLyIntegration", "Combines decal color with the underlying surface before opacity is applied. Normal maps use their separate opacity."))
+                        ->EnumAttribute(DecalBlendMode::Alpha, "Alpha")
+                        ->EnumAttribute(DecalBlendMode::Multiply, "Multiply")
+                        ->EnumAttribute(DecalBlendMode::Add, "Add")
+                        ->EnumAttribute(DecalBlendMode::Screen, "Screen")
+                        ->EnumAttribute(DecalBlendMode::Overlay, "Overlay")
+
                         ->DataElement(AZ::Edit::UIHandlers::Slider, &DecalComponentConfig::m_opacity,
                             QT_TRANSLATE_NOOP("AtomLyIntegration", "Opacity"),
                             QT_TRANSLATE_NOOP("AtomLyIntegration", "The opacity of the decal."))

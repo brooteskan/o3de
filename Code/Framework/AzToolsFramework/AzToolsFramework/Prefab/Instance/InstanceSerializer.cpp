@@ -276,7 +276,8 @@ namespace AzToolsFramework
 
                     InstanceAlias instanceAlias(instanceAliasValue.GetString(), instanceAliasValue.GetStringLength());
 
-                    AZStd::unique_ptr<Instance> nestedInstance = AZStd::make_unique<Instance>();
+                    AZStd::unique_ptr<Instance> nestedInstance =
+                        AZStd::make_unique<Instance>(instance->m_entityIdInstanceRelationship);
 
                     nestedInstance->m_alias = instanceAlias;
                     nestedInstance->m_parent = instance;

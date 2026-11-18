@@ -116,6 +116,8 @@ namespace PhysX
 
         // CharacterControllerRequestBus
         void Resize(float height) override;
+        bool SetRidingPlatform(AZ::EntityId platformEntity) override;
+        bool SetPushStrength(float newtons) override;
         float GetHeight() override;
         void SetHeight(float height) override;
         float GetRadius() override;

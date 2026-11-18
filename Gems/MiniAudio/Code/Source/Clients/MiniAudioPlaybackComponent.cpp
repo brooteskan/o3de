@@ -69,6 +69,8 @@ namespace MiniAudio
                 ->Event("Play", &MiniAudioPlaybackRequests::Play)
                 ->Event("Stop", &MiniAudioPlaybackRequests::Stop)
                 ->Event("Pause", &MiniAudioPlaybackRequests::Pause)
+                ->Event("IsPlaying", &MiniAudioPlaybackRequests::IsPlaying)
+                ->Event("IsPlaybackPending", &MiniAudioPlaybackRequests::IsPlaybackPending)
                 ->Event("SetLooping", &MiniAudioPlaybackRequests::SetLooping)
                 ->Event("IsLooping", &MiniAudioPlaybackRequests::IsLooping)
                 ->Event("GetSoundAsset", &MiniAudioPlaybackRequests::GetSoundAssetRef)

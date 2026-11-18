@@ -7,6 +7,8 @@
  */
 
 #include <AzFramework/Physics/PhysicsScene.h>
+#include <AzFramework/Physics/RigidBodyBus.h>
+#include <AzFramework/Physics/Components/SimulatedBodyComponentBus.h>
 
 #include <PhysXCharacters/API/CharacterController.h>
 #include <PhysXCharacters/API/CharacterUtils.h>
@@ -137,6 +139,144 @@ namespace PhysX
         Physics::Character* m_controller = nullptr;
         float m_timeStep = AzPhysics::SystemConfiguration::DefaultFixedTimestep;
     };
+
+    TEST_F(PhysXDefaultWorldTest, CharacterController_RegisteredDynamicPlatform_BlocksQueriesWithoutKickingPlatform)
+    {
+        ControllerTestBasis basis(m_testSceneHandle, Physics::ShapeType::Capsule,
+            AZ::Transform::CreateTranslation(AZ::Vector3(0.0f, 0.0f, -20.0f)));
+        auto platform = TestUtils::CreateBoxEntity(m_testSceneHandle,
+            AZ::Vector3(0.0f, 0.0f, 0.5f), AZ::Vector3(4.0f, 4.0f, 1.0f));
+        Physics::RigidBodyRequestBus::Event(platform->GetId(), &Physics::RigidBodyRequests::SetGravityEnabled, false);
+        auto* controller = static_cast<CharacterController*>(basis.m_controller);
+        bool registered = false;
+        CharacterControllerRequestBus::EventResult(registered, basis.m_controllerEntity->GetId(),
+            &CharacterControllerRequests::SetRidingPlatform, platform->GetId());
+        ASSERT_TRUE(registered);
+
+        // Movement queries must support the capsule on the dynamic box.
+        controller->SetBasePosition(AZ::Vector3(0.0f, 0.0f, 2.0f));
+        basis.Update(AZ::Vector3(0.0f, 0.0f, -2.0f), 90);
+        EXPECT_NEAR(controller->GetBasePosition().GetZ(), 1.0f, 0.03f);
+
+        // A scripted placement inside the carrier must not make the internal
+        // kinematic actor inject an impulse or force the carrier out of place.
+        controller->SetBasePosition(AZ::Vector3(0.0f, 0.0f, 0.5f));
+        basis.Update(AZ::Vector3::CreateZero(), 5);
+        AZ::Vector3 velocity = AZ::Vector3::CreateZero();
+        Physics::RigidBodyRequestBus::EventResult(velocity, platform->GetId(), &Physics::RigidBodyRequests::GetLinearVelocity);
+        EXPECT_LT(velocity.GetLength(), 1e-3f);
+        AzPhysics::SimulatedBody* platformBody = nullptr;
+        AzPhysics::SimulatedBodyComponentRequestsBus::EventResult(platformBody, platform->GetId(),
+            &AzPhysics::SimulatedBodyComponentRequests::GetSimulatedBody);
+        ASSERT_NE(platformBody, nullptr);
+        auto* boxActor = static_cast<physx::PxRigidDynamic*>(platformBody->GetNativePointer());
+        auto* characterActor = static_cast<physx::PxController*>(controller->GetNativePointer())->getActor();
+        physx::PxShape* boxShape = nullptr;
+        physx::PxShape* characterShape = nullptr;
+        ASSERT_EQ(boxActor->getShapes(&boxShape, 1), 1u);
+        ASSERT_EQ(characterActor->getShapes(&characterShape, 1), 1u);
+        const auto penetrationDepth = [&]()
+        {
+            physx::PxVec3 direction;
+            float depth = 0.0f;
+            const bool overlap = physx::PxGeometryQuery::computePenetration(direction, depth,
+                boxShape->getGeometry(), boxActor->getGlobalPose() * boxShape->getLocalPose(),
+                characterShape->getGeometry(), characterActor->getGlobalPose() * characterShape->getLocalPose());
+            return overlap ? depth : 0.0f;
+        };
+        EXPECT_GT(penetrationDepth(), 0.1f);
+
+        // Dismounting must restore contact and resolve the existing overlap.
+        // Check geometry: positional correction can leave zero final velocity.
+        ASSERT_TRUE(controller->SetRidingPlatform(AZ::EntityId()));
+        basis.Update(AZ::Vector3::CreateZero(), 5);
+        EXPECT_LE(penetrationDepth(), 0.002f);
+
+        // Removal while registered must clear the pair before native actor reuse.
+        ASSERT_TRUE(controller->SetRidingPlatform(platform->GetId()));
+        platform.reset();
+        basis.Update(AZ::Vector3::CreateZero());
+        EXPECT_TRUE(controller->SetRidingPlatform(AZ::EntityId()));
+    }
+
+    TEST_F(PhysXDefaultWorldTest, CharacterController_TeleportOutOfDynamicOverlap_DoesNotLaunchBody)
+    {
+        ControllerTestBasis basis(m_testSceneHandle, Physics::ShapeType::Capsule,
+            AZ::Transform::CreateTranslation(AZ::Vector3(0.0f, 0.0f, -20.0f)));
+        basis.Update(AZ::Vector3::CreateZero());
+        auto box = TestUtils::CreateBoxEntity(m_testSceneHandle,
+            AZ::Vector3(0.0f, 0.0f, 0.5f), AZ::Vector3(4.0f, 4.0f, 1.0f));
+        Physics::RigidBodyRequestBus::Event(box->GetId(), &Physics::RigidBodyRequests::SetGravityEnabled, false);
+        AzPhysics::SimulatedBody* boxBody = nullptr;
+        AzPhysics::SimulatedBodyComponentRequestsBus::EventResult(boxBody, box->GetId(),
+            &AzPhysics::SimulatedBodyComponentRequests::GetSimulatedBody);
+        ASSERT_NE(boxBody, nullptr);
+        auto* boxActor = static_cast<physx::PxRigidDynamic*>(boxBody->GetNativePointer());
+        boxActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eENABLE_CCD, true);
+        boxActor->setRigidBodyFlag(physx::PxRigidBodyFlag::eENABLE_SPECULATIVE_CCD, true);
+        boxActor->setMaxDepenetrationVelocity(2.0f);
+        boxActor->setSolverIterationCounts(8, 4);
+
+        // Both logical and physical character positions must jump immediately.
+        // A delayed kinematic proxy would sweep out of this overlap at 300 m/s.
+        basis.m_controller->SetBasePosition(AZ::Vector3(5.0f, 0.0f, 0.0f));
+        auto* proxy = static_cast<physx::PxController*>(basis.m_controller->GetNativePointer())->getActor();
+        EXPECT_NEAR(proxy->getGlobalPose().p.x, 5.0f, 1e-4f);
+        basis.Update(AZ::Vector3::CreateZero());
+        EXPECT_LT(boxActor->getLinearVelocity().magnitude(), 1e-3f);
+        EXPECT_NEAR(boxActor->getGlobalPose().p.x, 0.0f, 1e-3f);
+    }
+
+    TEST_F(PhysXDefaultWorldTest, CharacterController_ZeroPushStrength_BlocksWithoutMovingDynamicBody)
+    {
+        ControllerTestBasis basis(m_testSceneHandle, Physics::ShapeType::Capsule,
+            AZ::Transform::CreateTranslation(AZ::Vector3(0, 0, -20)));
+        auto box = TestUtils::CreateBoxEntity(m_testSceneHandle, AZ::Vector3(2, 0, .5f), AZ::Vector3(1, 4, 4));
+        Physics::RigidBodyRequestBus::Event(box->GetId(), &Physics::RigidBodyRequests::SetGravityEnabled, false);
+        bool applied = false;
+        CharacterControllerRequestBus::EventResult(applied, basis.m_controllerEntity->GetId(),
+            &CharacterControllerRequests::SetPushStrength, 0.f);
+        ASSERT_TRUE(applied);
+        basis.Update(AZ::Vector3(3, 0, 0), 240);
+        EXPECT_LT(basis.m_controller->GetBasePosition().GetX(), 1.4f);
+        AZ::Vector3 velocity;
+        Physics::RigidBodyRequestBus::EventResult(velocity, box->GetId(), &Physics::RigidBodyRequests::GetLinearVelocity);
+        EXPECT_LT(velocity.GetLength(), 1.e-3f);
+    }
+
+    TEST_F(PhysXDefaultWorldTest, CharacterController_LimitedPushStrength_CapsMomentumAndKeepsMass)
+    {
+        ControllerTestBasis basis(m_testSceneHandle, Physics::ShapeType::Capsule,
+            AZ::Transform::CreateTranslation(AZ::Vector3(0, 0, -20)));
+        auto box = TestUtils::CreateBoxEntity(m_testSceneHandle, AZ::Vector3(2, 0, .5f), AZ::Vector3(1, 4, 4));
+        Physics::RigidBodyRequestBus::Event(box->GetId(), &Physics::RigidBodyRequests::SetGravityEnabled, false);
+        Physics::RigidBodyRequestBus::Event(box->GetId(), &Physics::RigidBodyRequests::SetMass, 650.f);
+        auto* controller = static_cast<CharacterController*>(basis.m_controller);
+        ASSERT_TRUE(controller->SetPushStrength(150));
+        basis.Update(AZ::Vector3(3, 0, 0), 240);
+        AZ::Vector3 velocity;
+        Physics::RigidBodyRequestBus::EventResult(velocity, box->GetId(), &Physics::RigidBodyRequests::GetLinearVelocity);
+        EXPECT_GT(velocity.GetX(), .01f);
+        EXPECT_LE(velocity.GetLength() * 650, 150 * 240 * basis.m_timeStep + .1f);
+        EXPECT_NEAR(velocity.GetZ(), 0, 1.e-3f);
+        EXPECT_FALSE(controller->SetPushStrength(-2));
+    }
+
+    TEST_F(PhysXDefaultWorldTest, CharacterController_LimitedPushStrength_RespectsProtectedPlatform)
+    {
+        ControllerTestBasis basis(m_testSceneHandle, Physics::ShapeType::Capsule,
+            AZ::Transform::CreateTranslation(AZ::Vector3(0, 0, -20)));
+        auto box = TestUtils::CreateBoxEntity(m_testSceneHandle, AZ::Vector3(2, 0, .5f), AZ::Vector3(1, 4, 4));
+        Physics::RigidBodyRequestBus::Event(box->GetId(), &Physics::RigidBodyRequests::SetGravityEnabled, false);
+        auto* controller = static_cast<CharacterController*>(basis.m_controller);
+        ASSERT_TRUE(controller->SetPushStrength(150));
+        ASSERT_TRUE(controller->SetRidingPlatform(box->GetId()));
+        basis.Update(AZ::Vector3(3, 0, 0), 240);
+        AZ::Vector3 velocity;
+        Physics::RigidBodyRequestBus::EventResult(velocity, box->GetId(), &Physics::RigidBodyRequests::GetLinearVelocity);
+        EXPECT_LT(velocity.GetLength(), 1.e-3f);
+        EXPECT_LT(basis.m_controller->GetBasePosition().GetX(), 1.4f);
+    }
 
     Physics::ShapeType controllerShapeTypes[] = { Physics::ShapeType::Capsule, Physics::ShapeType::Box };
 

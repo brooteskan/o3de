@@ -27,6 +27,10 @@ option bool o_applySpecularAA;
 //
 float CalculateSpecularAA(float3 normal, float roughnessA2)
 {
+#if defined(ATOM_CUSTOM_SPECULAR_AA)
+    // The material owns the local normal continuation when visibility is discontinuous.
+    return ATOM_CUSTOM_SPECULAR_AA(normal, roughnessA2);
+#else
     // Constants for formula below
     const float screenVariance = 0.25f;
     const float varianceThresh = 0.18f;
@@ -38,6 +42,7 @@ float CalculateSpecularAA(float3 normal, float roughnessA2)
     float kernelRoughnessA2 = min(2.0 * variance , varianceThresh );
     float filteredRoughnessA2 = saturate ( roughnessA2 + kernelRoughnessA2 );
     return filteredRoughnessA2;
+#endif
 }
 
 #endif

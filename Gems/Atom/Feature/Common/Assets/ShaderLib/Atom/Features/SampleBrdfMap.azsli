@@ -15,7 +15,7 @@
 #if PIPELINE_HAS_PASS_SRG
 float2 SampleBrdfMap(float2 brdfUV)
 {
-#ifdef CS_SAMPLERS
+#if defined(CS_SAMPLERS) || defined(ATOM_EXPLICIT_LIGHTING_LOOKUPS)
     return PassSrg::m_brdfMap.SampleLevel(PassSrg::LinearSampler, brdfUV, 0).rg;
 #else
     return PassSrg::m_brdfMap.Sample(PassSrg::LinearSampler, brdfUV).rg;

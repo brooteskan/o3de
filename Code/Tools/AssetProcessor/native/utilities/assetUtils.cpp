@@ -8,6 +8,7 @@
 #include "assetUtils.h"
 
 #include <AzCore/Component/ComponentApplication.h>
+#include <AzCore/std/algorithm.h>
 #include <AzCore/Math/Sha1.h>
 #include <AzCore/Settings/SettingsRegistry.h>
 
@@ -1519,7 +1520,12 @@ namespace AssetUtilities
             return {};
         }
 
-        if (sources.size() > 1)
+        // Rebuilding a material pipeline can retain product records with
+        // different sub-IDs for the same filename and owning source. The query
+        // returns one row per product; these rows do not imply distinct owners.
+        const auto ownerSourceId = sources.front().m_sourceID;
+        if (AZStd::any_of(sources.begin(), sources.end(), [ownerSourceId](const auto& source)
+            { return source.m_sourceID != ownerSourceId; }))
         {
             AZ_Error(AssetProcessor::ConsoleChannel, false, "GetTopLevelSourceForProduct found multiple sources for product %s", sourceAsset.AbsolutePath().c_str());
             return {};

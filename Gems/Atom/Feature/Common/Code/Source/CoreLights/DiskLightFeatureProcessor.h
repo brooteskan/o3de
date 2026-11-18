@@ -49,6 +49,7 @@ namespace AZ
             void SetPosition(LightHandle handle, const AZ::Vector3& lightPosition) override;
             void SetDirection(LightHandle handle, const AZ::Vector3& lightDirection) override;
             void SetAttenuationRadius(LightHandle handle, float attenuationRadius) override;
+            void SetFalloffRate(LightHandle handle, float rate) override;
             void SetDiskRadius(LightHandle handle, float radius) override;
             void SetConstrainToConeLight(LightHandle handle, bool useCone) override;
             void SetConeAngles(LightHandle handle, float innerDegrees, float outerDegrees) override;

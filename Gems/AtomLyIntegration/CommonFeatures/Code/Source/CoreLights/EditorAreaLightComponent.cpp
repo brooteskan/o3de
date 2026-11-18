@@ -86,6 +86,9 @@ namespace AZ
                                 QT_TRANSLATE_NOOP("AtomLyIntegration", "Quad"))
                             ->EnumAttribute(AreaLightComponentConfig::LightType::Polygon,
                                 QT_TRANSLATE_NOOP("AtomLyIntegration", "Polygon"))
+                        ->DataElement(Edit::UIHandlers::CheckBox, &AreaLightComponentConfig::m_lockBlenderExport,
+                            QT_TRANSLATE_NOOP("AtomLyIntegration", "Lock Blender Export"),
+                            QT_TRANSLATE_NOOP("AtomLyIntegration", "Protect this light from the TG tower exporter."))
                         ->DataElement(Edit::UIHandlers::Color, &AreaLightComponentConfig::m_color,
                             QT_TRANSLATE_NOOP("AtomLyIntegration", "Color"),
                             QT_TRANSLATE_NOOP("AtomLyIntegration", "Color of the light"))
@@ -137,6 +140,13 @@ namespace AZ
                             ->Attribute(Edit::Attributes::ReadOnly, &AreaLightComponentConfig::IsAttenuationRadiusModeAutomatic)
                             ->Attribute(Edit::Attributes::Visibility, &AreaLightComponentConfig::LightTypeIsSelected)
                         
+                        ->DataElement(Edit::UIHandlers::Slider, &AreaLightComponentConfig::m_falloffRate,
+                            QT_TRANSLATE_NOOP("AtomLyIntegration", "Falloff rate"),
+                            QT_TRANSLATE_NOOP("AtomLyIntegration", "1 preserves the normal fade. Higher values fade sooner within the same radius."))
+                            ->Attribute(Edit::Attributes::Min, 0.25f)
+                            ->Attribute(Edit::Attributes::Max, 8.0f)
+                            ->Attribute(Edit::Attributes::Visibility, &AreaLightComponentConfig::SupportsFalloffRate)
+
                         ->DataElement(AZ::Edit::UIHandlers::Default, &AreaLightComponentConfig::m_lightingChannelConfig,
                             QT_TRANSLATE_NOOP("AtomLyIntegration", "Lighting Channels"), "")
                             ->Attribute(AZ::Edit::Attributes::ChangeNotify, AZ::Edit::PropertyRefreshLevels::AttributesAndValues)

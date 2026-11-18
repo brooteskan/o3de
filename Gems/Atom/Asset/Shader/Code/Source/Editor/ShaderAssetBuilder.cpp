@@ -226,6 +226,8 @@ namespace AZ
                 jobDescriptor.m_priority = 2;
                 jobDescriptor.m_critical = false;
                 jobDescriptor.m_jobKey = ShaderAssetBuilderJobKey;
+                // Analysis fingerprints cause CreateJobs; this also invalidates compiled products.
+                jobDescriptor.m_additionalFingerprintInfo = AZStd::string::format("TG.DX12.SM.%d.v1", TG_DX12_SHADER_MODEL);
                 jobDescriptor.SetPlatformIdentifier(platformInfo.m_identifier.c_str());
                 response.m_createJobOutputs.emplace_back(AZStd::move(jobDescriptor));
             } // for all request.m_enabledPlatforms
@@ -450,6 +452,12 @@ namespace AZ
                     // Run the preprocessor.
                     PreprocessorData output;
                     auto preprocessorArguments = AppendIncludePathsToArgumentList(buildArgsManager.GetCurrentArguments().m_preprocessorArguments, projectIncludePaths);
+                    if (shaderPlatformInterface->GetAPIName() == AZ::Name("dx12"))
+                    {
+                        // These describe compilation support, not optional runtime GPU capabilities.
+                        preprocessorArguments.emplace_back(AZStd::string::format("-DTG_DX12_SHADER_MODEL=%d", TG_DX12_SHADER_MODEL));
+                        preprocessorArguments.emplace_back(AZStd::string::format("-DTG_DX12_SHADER_MODEL_6_7=%u", TG_DX12_SHADER_MODEL == 67 ? 1u : 0u));
+                    }
                     const bool preprocessorSuccess = PreprocessFile(prependedAzslFilePath, output, preprocessorArguments,  true);
                     if (RHI::ReportMessages(ShaderAssetBuilderName, output.diagnostics, !preprocessorSuccess))
                     {

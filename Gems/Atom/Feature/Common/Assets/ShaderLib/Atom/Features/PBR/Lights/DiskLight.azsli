@@ -94,6 +94,11 @@ class DiskLightUtil_PBR
         // Smoothly adjusts the light intensity so it reaches 0 at light.m_attenuationRadius distance
         float radiusAttenuation = 1.0 - (m_falloff * m_falloff);
         radiusAttenuation = radiusAttenuation * radiusAttenuation;
+        if (light.m_falloffRate != 1.0)
+        {
+            // Change distance decay independently of the outer cutoff.
+            radiusAttenuation *= pow(1.0 + m_lightDistanceSquared, 0.5 * (1.0 - light.m_falloffRate));
+        }
 
         // Find the distance to the closest point on the disk
         float distanceToPlane = dot(m_posToLight, -light.m_direction);

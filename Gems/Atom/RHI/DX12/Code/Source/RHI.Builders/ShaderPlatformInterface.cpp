@@ -237,9 +237,7 @@ namespace AZ
             // Shader compiler executable
             const auto dxcRelativePath = RHI::GetDirectXShaderCompilerPath("Builders/DirectXShaderCompiler/dxc.exe");
 
-            // NOTE:
-            // Running DX12 on PC with DXIL shaders requires modern GPUs and at least Windows 10 Build 1803 or later for Shader Model 6.2
-            // https://github.com/Microsoft/DirectXShaderCompiler/wiki/Running-Shaders
+            // The target is selected at configure time and checked by the runtime device.
 
             // -Fo "Output object file"
             AZStd::string shaderOutputFile;
@@ -253,17 +251,17 @@ namespace AZ
             AzFramework::StringFunc::Path::Join(tempFolder.c_str(), objectCodeOutputFile.c_str(), objectCodeOutputFile);
             AzFramework::StringFunc::Path::ReplaceExtension(objectCodeOutputFile, "dxil.txt");
 
-            // Stage profile name parameter
-            // Note: RayTracing shaders must be compiled with version 6_3, while the rest of the stages
-            // are compiled with version 6_2, so RayTracing cannot share the version constant.
-            const AZStd::string shaderModelVersion = "6_2";
+            static_assert(TG_DX12_SHADER_MODEL == 62 || TG_DX12_SHADER_MODEL == 67);
+            const AZStd::string shaderModelVersion = TG_DX12_SHADER_MODEL == 67 ? "6_7" : "6_2";
+            // DXR libraries require at least SM 6.3 in the compatibility build.
+            const AZStd::string rayTracingProfile = TG_DX12_SHADER_MODEL == 67 ? "lib_6_7" : "lib_6_3";
             const AZStd::unordered_map<RHI::ShaderHardwareStage, AZStd::string> stageToProfileName =
             {
                 {RHI::ShaderHardwareStage::Vertex,                 "vs_" + shaderModelVersion},
                 {RHI::ShaderHardwareStage::Fragment,               "ps_" + shaderModelVersion},
                 {RHI::ShaderHardwareStage::Compute,                "cs_" + shaderModelVersion},
                 {RHI::ShaderHardwareStage::Geometry,               "gs_" + shaderModelVersion},
-                {RHI::ShaderHardwareStage::RayTracing,             "lib_6_3"}
+                {RHI::ShaderHardwareStage::RayTracing,             rayTracingProfile}
             };
             auto profileIt = stageToProfileName.find(shaderStageType);
             if (profileIt == stageToProfileName.end())
@@ -276,6 +274,12 @@ namespace AZ
 
             // Compilation parameters
             auto dxcArguments = shaderBuildArguments.m_dxcArguments;
+            if (TG_DX12_SHADER_MODEL == 67 && shaderStageType == RHI::ShaderHardwareStage::RayTracing
+                && !RHI::ShaderBuildArguments::HasArgument(dxcArguments, "-enable-payload-qualifiers"))
+            {
+                // Keep O3DE's existing DXR payload convention at SM 6.7. Annotated libraries can opt in.
+                RHI::ShaderBuildArguments::AppendArguments(dxcArguments, { "-disable-payload-qualifiers" });
+            }
             if (graphicsDevMode || BuildHasDebugInfo(shaderBuildArguments))
             {
                 RHI::ShaderBuildArguments::AppendArguments(dxcArguments, { "-Zi", "-Zss", "-Od" });

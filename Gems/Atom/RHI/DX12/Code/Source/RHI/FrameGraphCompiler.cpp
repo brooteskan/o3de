@@ -330,7 +330,10 @@ namespace AZ
                 {
                     return D3D12_RESOURCE_STATE_DEPTH_WRITE;
                 }
-                break;
+                // UAV textures also need an explicit state before DiscardResource.
+                // Otherwise the debug layer assumes UAV at the discard, while the
+                // following prologue barrier still uses the previous read state.
+                [[fallthrough]];
             }
             case RHI::HardwareQueueClass::Compute:
             {

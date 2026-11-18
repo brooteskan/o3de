@@ -49,6 +49,7 @@ namespace AZ
             void SetLightEmitsBothDirections(LightHandle handle, bool lightEmitsBothDirections) override;
             void SetUseFastApproximation(LightHandle handle, bool useFastApproximation) override;
             void SetAttenuationRadius(LightHandle handle, float attenuationRadius) override;
+            void SetFalloffRate(LightHandle handle, float rate) override;
             void SetQuadDimensions(LightHandle handle, float width, float height) override;
             void SetAffectsGI(LightHandle handle, bool affectsGI) override;
             void SetAffectsGIFactor(LightHandle handle, float affectsGIFactor) override;

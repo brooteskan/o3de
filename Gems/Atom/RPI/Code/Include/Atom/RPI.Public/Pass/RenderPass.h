@@ -95,6 +95,10 @@ namespace AZ
             // Binds the pass's attachments to the provide SRG (this will usually be the pass's own SRG)
             void BindPassSrg(const RHI::FrameGraphCompileContext& context, Data::Instance<ShaderResourceGroup>& shaderResourceGroup);
 
+            //! Validate cached attachment indices against the current SRG layout.
+            //! A named binding can be recovered after a shader layout shrinks.
+            RHI::ShaderInputImageIndex ResolveShaderInputImageIndex(PassAttachmentBinding& binding, int16_t imageIndex);
+
             // Pass behavior overrides...
             void InitializeInternal() override;
             void FrameBeginInternal(FramePrepareParams params) override;

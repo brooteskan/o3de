@@ -26,6 +26,9 @@ namespace AZ
             : public ComponentBus
         {
         public:
+            //! Current packed shader index; does not acquire or mutate the light.
+            virtual uint32_t GetShaderLightIndex() const { return ~uint32_t(0); }
+
             //! Gets a directional light's color. This value is independent from its intensity.
             //! @return directional light's color
             virtual const Color& GetColor() const = 0;

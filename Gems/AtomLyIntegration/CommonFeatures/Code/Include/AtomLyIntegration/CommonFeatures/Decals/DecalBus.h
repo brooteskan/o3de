@@ -31,6 +31,11 @@ namespace AZ
             //! Sets the attenuation angle. This controls how much the angle between geometry and the decal affects decal opacity.
             virtual void SetAttenuationAngle(float angle) = 0;
 
+            //! Gets the color compositing mode.
+            virtual DecalBlendMode GetBlendMode() const = 0;
+            //! Sets the color compositing mode. Normal map opacity remains independent.
+            virtual void SetBlendMode(DecalBlendMode blendMode) = 0;
+
             //! Gets the decal opacity
             virtual float GetOpacity() const = 0;
 
@@ -90,6 +95,9 @@ namespace AZ
             //! Signals that the decal color factor has changed.
             //! @param decalColorFacor This controls the decal color factor (in this case it is a multiplier) applied to the decal color
             virtual void OnDecalColorFactorChanged([[maybe_unused]] float decalColorFacor) { }
+
+            //! Signals that the color compositing mode has changed.
+            virtual void OnBlendModeChanged([[maybe_unused]] DecalBlendMode blendMode) { }
 
             //! Signals that the opacity has changed.
             //! @param opacity The opaqueness of the decal.

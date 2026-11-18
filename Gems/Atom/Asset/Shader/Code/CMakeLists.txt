@@ -12,6 +12,7 @@ endif()
 
 o3de_pal_dir(pal_source_dir ${CMAKE_CURRENT_LIST_DIR}/Source/Platform/${PAL_PLATFORM_NAME} "${gem_restricted_path}" "${gem_path}" "${gem_parent_relative_path}")
 set(common_source_dir ${CMAKE_CURRENT_LIST_DIR}/Source/Platform/Common)
+include(${LY_ROOT_FOLDER}/cmake/TGDX12ShaderModel.cmake)
 
 include(${pal_source_dir}/PAL_${PAL_PLATFORM_NAME_LOWERCASE}.cmake) #for PAL_TRAIT_BUILD_ATOM_ASSET_SHADER_SUPPORTED
 
@@ -79,6 +80,8 @@ ly_add_target(
             Gem::Atom_RPI.Edit
             Gem::Atom_RPI.Public
 )
+
+tg_set_dx12_shader_model(Gem::${gem_name}.Static)
 
 set(builder_tools_include_files)
 foreach(enabled_platform ${LY_PAL_TOOLS_ENABLED})

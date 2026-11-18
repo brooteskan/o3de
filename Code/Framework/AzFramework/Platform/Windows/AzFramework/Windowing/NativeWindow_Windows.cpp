@@ -13,6 +13,7 @@
 
 #include <AzCore/Module/DynamicModuleHandle.h>
 #include <AzCore/PlatformIncl.h>
+#include <AzCore/Settings/SettingsRegistry.h>
 #include <AzCore/std/containers/array.h>
 #include <AzCore/std/string/conversions.h>
 
@@ -45,6 +46,17 @@ namespace AzFramework
 
     void DrawSplash(HWND hWnd)
     {
+        // Custom application presentations can own startup before Atom is ready.
+        // Keep the legacy bitmap enabled by default for other launch paths.
+        bool showSplash = true;
+        if (auto registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(showSplash, "/O3DE/AzFramework/Windowing/ShowSplash");
+        }
+        if (!showSplash)
+        {
+            return;
+        }
         const HINSTANCE hInstance = GetModuleHandle(nullptr);
         auto hImage = (HBITMAP)LoadImageA(hInstance, MAKEINTRESOURCEA(IDB_SPLASH1), IMAGE_BITMAP, 0, 0, 0);
         if (hImage)
@@ -98,7 +110,17 @@ namespace AzFramework
             }
         }
 
-        const DWORD windowStyle = ConvertToWin32WindowStyleMask(styleMasks);
+        DWORD windowStyle = ConvertToWin32WindowStyleMask(styleMasks);
+        bool borderless = false;
+        if (auto registry = AZ::SettingsRegistry::Get())
+        {
+            registry->Get(borderless, "/O3DE/AzFramework/Windowing/Borderless");
+        }
+        if (borderless)
+        {
+            windowStyle &= ~(WS_CAPTION | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU);
+            windowStyle |= WS_POPUP;
+        }
         const BOOL windowHasMenu = FALSE;
 
         // Adjust the window size so that the geometry we were given is the size of the client area.
@@ -118,10 +140,23 @@ namespace AzFramework
         // create main window
         AZStd::wstring titleW;
         AZStd::to_wstring(titleW, title);
+        int positionX = geometry.m_posX, positionY = geometry.m_posY;
+        if (auto registry = AZ::SettingsRegistry::Get())
+        {
+            AZ::s64 centerX{}, centerY{};
+            if (registry->Get(centerX, "/O3DE/AzFramework/Windowing/CenterX") &&
+                registry->Get(centerY, "/O3DE/AzFramework/Windowing/CenterY"))
+            {
+                // Place the window before activation/swapchain creation so fullscreen
+                // selects the requested display without flashing on the primary one.
+                positionX = static_cast<int>(centerX - (windowRect.right - windowRect.left) / 2);
+                positionY = static_cast<int>(centerY - (windowRect.bottom - windowRect.top) / 2);
+            }
+        }
         m_win32Handle = CreateWindowW(
             s_defaultClassName, titleW.c_str(),
             windowStyle,
-            geometry.m_posX, geometry.m_posY, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,
+            positionX, positionY, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,
             nullptr, nullptr, hInstance, nullptr);
 
         if (m_win32Handle == nullptr)
@@ -260,6 +295,11 @@ namespace AzFramework
     LRESULT CALLBACK NativeWindowImpl_Win32::WindowCallback(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
         NativeWindowImpl_Win32* nativeWindowImpl = reinterpret_cast<NativeWindowImpl_Win32*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+        // CreateWindow can send size/position messages before GWLP_USERDATA is attached.
+        if (!nativeWindowImpl)
+        {
+            return DefWindowProc(hWnd, message, wParam, lParam);
+        }
 
         // If set to true, call DefWindowProc to ensure the default Windows behavior occurs
         bool shouldBubbleEventUp = false;

@@ -27,7 +27,8 @@ namespace SkyAtmosphere
         {
             m_descriptors.insert(m_descriptors.end(),
                 {
-                    SkyAtmosphereSystemComponent::CreateDescriptor(),
+                    // The base module already owns the system descriptor. Adding it
+                    // again would release the same singleton twice during shutdown.
                     SkyAtmosphereComponent::CreateDescriptor(),
                 });
         }

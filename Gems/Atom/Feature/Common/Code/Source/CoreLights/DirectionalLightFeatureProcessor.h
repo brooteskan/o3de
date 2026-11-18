@@ -254,6 +254,8 @@ namespace AZ
 
             const Data::Instance<RPI::Buffer> GetLightBuffer() const override { return m_lightBufferHandler.GetBuffer(); }
             uint32_t GetLightCount() const override { return m_lightBufferHandler.GetElementCount(); }
+            uint32_t GetShaderLightIndex(LightHandle handle) const override
+            { return handle.IsValid() ? m_lightData.GetRawIndex(handle.GetIndex()) : ~uint32_t(0); }
             ShadowProperty& GetShadowProperty(LightHandle handle) { return m_shadowProperties.GetData(handle.GetIndex()); }
 
         private:

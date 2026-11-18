@@ -13,7 +13,7 @@ namespace AZ::Prefab
 {
     // This allows the component's serialization version, and the builder version, to remain in sync.
     // Not strictly required, but it's useful to modify one when the other is modified, to keep data synchronized.
-    const int PrefabBuilderComponentVersion = 1;
+    const int PrefabBuilderComponentVersion = 2;
 
     void PrefabBuilderComponent::Reflect(AZ::ReflectContext* context)
     {

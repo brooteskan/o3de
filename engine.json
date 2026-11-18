@@ -107,9 +107,7 @@
         "PrefabBuilder",
         "SceneProcessing"
     ],
-    "projects": [
-        "AutomatedTesting"
-    ],
+    "projects": [],
     "templates": [
         "Templates/GameplayGem",
         "Templates/AssetGem",

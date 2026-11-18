@@ -27,6 +27,14 @@ namespace PhysX
         /// @param height The new height for the controller.
         virtual void Resize(float height) = 0;
 
+        /// Register a dynamic platform while externally carrying this character.
+        /// Movement queries collide with it; the internal kinematic actor cannot push it.
+        /// Pass an invalid entity to restore normal interactions when dismounting.
+        virtual bool SetRidingPlatform([[maybe_unused]] AZ::EntityId platformEntity) { return false; }
+
+        /// Maximum horizontal pushing force in newtons. Zero blocks without pushing; -1 restores legacy contacts.
+        virtual bool SetPushStrength([[maybe_unused]] float newtons) { return false; }
+
         /// Gets the height of the controller.
         virtual float GetHeight() = 0;
 

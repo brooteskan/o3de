@@ -76,11 +76,11 @@ namespace AZ
                 // the list index passed in from the feature processor is the index of this probe in the sorted probe list.
                 // this is needed to render the probe volumes in order from largest to smallest
                 RHI::DrawItemSortKey sortKey = static_cast<RHI::DrawItemSortKey>(probeIndex);
-                if (sortKey != m_sortKey)
+                if (sortKey != m_sortKey || m_drawPacketPipelineState != m_renderData->m_pipelineState->GetRHIPipelineState())
                 {
                     if (m_renderData->m_pipelineState->GetRHIPipelineState())
                     {
-                        // the sort key changed, rebuild draw packets
+                        // The sort key or render output changed (for example MSAA). Rebuild the cached draw packet.
                         m_sortKey = sortKey;
 
                         RHI::DrawPacketBuilder drawPacketBuilder{RHI::MultiDevice::AllDevices};
@@ -96,6 +96,7 @@ namespace AZ
                         drawPacketBuilder.AddDrawItem(drawRequest);
 
                         m_drawPacket = drawPacketBuilder.End();
+                        m_drawPacketPipelineState = m_renderData->m_pipelineState->GetRHIPipelineState();
 
                         // we also need to update culling with the new draw packet
                         UpdateCulling();

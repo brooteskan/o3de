@@ -47,6 +47,8 @@ namespace AZ
             const DirectionalLightComponentConfig& GetConfiguration() const;
 
             // DirectionalLightRequestBus::Handler overrides...
+            uint32_t GetShaderLightIndex() const override
+            { return m_featureProcessor ? m_featureProcessor->GetShaderLightIndex(m_lightHandle) : ~uint32_t(0); }
             const Color& GetColor() const override;
             void SetColor(const Color& color) override;
             float GetIntensity() const override;

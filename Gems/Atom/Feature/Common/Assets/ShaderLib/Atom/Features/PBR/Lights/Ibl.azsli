@@ -37,7 +37,7 @@ real3 GetIblDiffuse(
     real3 diffuseResponse)
 {
     real3 irradianceDir = MultiplyVectorQuaternion(normal, real4(SceneSrg::m_iblOrientation));
-    #ifdef CS_SAMPLERS
+    #if defined(CS_SAMPLERS) || defined(ATOM_EXPLICIT_LIGHTING_LOOKUPS)
     real3 diffuseSample = real3(SceneSrg::m_diffuseEnvMap.SampleLevel(SceneSrg::m_samplerEnv, GetCubemapCoords(irradianceDir), 0).rgb);
     #else
     real3 diffuseSample = real3(SceneSrg::m_diffuseEnvMap.Sample(SceneSrg::m_samplerEnv, GetCubemapCoords(irradianceDir)).rgb);

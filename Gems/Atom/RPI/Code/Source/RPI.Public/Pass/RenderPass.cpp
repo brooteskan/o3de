@@ -338,6 +338,31 @@ namespace AZ
             frameGraph.SetGroupId(GetSubpassGroupId());
         }
 
+        RHI::ShaderInputImageIndex RenderPass::ResolveShaderInputImageIndex(PassAttachmentBinding& binding, int16_t imageIndex)
+        {
+            const auto* layout = m_shaderResourceGroup->GetLayout();
+            const auto inputs = layout->GetShaderInputListForImages();
+            int16_t index = binding.m_shaderInputIndex == PassAttachmentBinding::ShaderInputAutoBind ? imageIndex : binding.m_shaderInputIndex;
+            if ((index < 0 || static_cast<size_t>(index) >= inputs.size()) && binding.m_shaderInputName != Name("AutoBind"))
+            {
+                const auto resolved = m_shaderResourceGroup->FindShaderInputImageIndex(binding.m_shaderInputName);
+                if (resolved.IsValid())
+                {
+                    index = static_cast<int16_t>(resolved.GetIndex());
+                    binding.m_shaderInputIndex = index;
+                }
+            }
+            if (index < 0 || static_cast<size_t>(index) >= inputs.size() || binding.m_shaderInputArrayIndex >= inputs[index].m_count)
+            {
+                AZ_ErrorOnce("PassSystem", false,
+                    "[Pass '%s'] attachment '%s' shader input '%s' has image index %d / array index %u outside SRG '%s' (%zu image inputs); binding skipped.",
+                    GetPathName().GetCStr(), binding.m_name.GetCStr(), binding.m_shaderInputName.GetCStr(), index,
+                    static_cast<uint32_t>(binding.m_shaderInputArrayIndex), layout->GetName().GetCStr(), inputs.size());
+                return {};
+            }
+            return RHI::ShaderInputImageIndex(static_cast<uint32_t>(index));
+        }
+
         void RenderPass::BindAttachment(const RHI::FrameGraphCompileContext& context, PassAttachmentBinding& binding, int16_t& imageIndex, int16_t& bufferIndex)
         {
             PassAttachment* attachment = binding.GetAttachment().get();
@@ -377,7 +402,11 @@ namespace AZ
                         binding.m_scopeAttachmentUsage != RHI::ScopeAttachmentUsage::DepthStencil &&
                         binding.m_scopeAttachmentUsage != RHI::ScopeAttachmentUsage::Resolve)
                     {
-                        m_shaderResourceGroup->SetImageView(RHI::ShaderInputImageIndex(inputIndex), imageView, arrayIndex);
+                        const auto resolved = ResolveShaderInputImageIndex(binding, imageIndex);
+                        if (resolved.IsValid())
+                        {
+                            m_shaderResourceGroup->SetImageView(resolved, imageView, arrayIndex);
+                        }
                         ++imageIndex;
                     }
                 }

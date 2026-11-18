@@ -231,6 +231,19 @@ namespace PhysX
         EXPECT_TRUE(groundDetected);
     }
 
+    TEST_F(PhysXDefaultWorldTest, CharacterGameplayController_MeshWallDoesNotProvideGroundSupport)
+    {
+        GameplayTestBasis basis(m_testSceneHandle);
+        const auto mesh = TestUtils::AddStaticTriangleMeshCubeToScene(m_testSceneHandle, 0.5f);
+        ASSERT_NE(mesh, AzPhysics::InvalidSimulatedBodyHandle);
+
+        // Both foot probes touch the same collider. Only the second is at the top.
+        basis.m_controller->SetBasePosition(AZ::Vector3(0.6f, 0.0f, 0.0f));
+        EXPECT_FALSE(basis.m_gameplayController->IsOnGround());
+        basis.m_controller->SetBasePosition(AZ::Vector3(0.45f, 0.0f, 0.501f));
+        EXPECT_TRUE(basis.m_gameplayController->IsOnGround());
+    }
+
     using PhysXDefaultWorldTestWithParamFixture = PhysXDefaultWorldTestWithParam<int>;
 
     //! Test that verifies that an entity with a gameplay controller is falling under gravity as expected.

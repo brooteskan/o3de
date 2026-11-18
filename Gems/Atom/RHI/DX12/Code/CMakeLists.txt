@@ -11,6 +11,7 @@ o3de_pal_dir(pal_source_dir ${CMAKE_CURRENT_LIST_DIR}/Source/Platform/${PAL_PLAT
 o3de_pal_dir(common_source_dir ${CMAKE_CURRENT_LIST_DIR}/Source/Platform/Common "${gem_restricted_path}" "${gem_path}" "${gem_parent_relative_path}")
 
 include(${pal_source_dir}/PAL_${PAL_PLATFORM_NAME_LOWERCASE}.cmake) # PAL_TRAIT_ATOM_RHI_DX12_SUPPORTED
+include(${LY_ROOT_FOLDER}/cmake/TGDX12ShaderModel.cmake)
 
 if(PAL_TRAIT_AFTERMATH_AVAILABLE)
     set(USE_NSIGHT_AFTERMATH_DEFINE $<IF:$<CONFIG:release>,"","USE_NSIGHT_AFTERMATH">)
@@ -142,6 +143,8 @@ ly_add_target(
             
 )
 
+tg_set_dx12_shader_model(Gem::${gem_name}.Private.Static)
+
 ly_add_target(
     NAME ${gem_name}.Interface STATIC
     NAMESPACE Gem
@@ -208,6 +211,8 @@ if(PAL_TRAIT_BUILD_HOST_TOOLS)
                 Gem::Atom_RHI.Reflect
                 Gem::${gem_name}.Reflect
     )
+
+    tg_set_dx12_shader_model(Gem::${gem_name}.Builders.Static)
 
     ly_add_target(
         NAME ${gem_name}.Builders GEM_MODULE

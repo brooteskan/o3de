@@ -23,9 +23,10 @@ namespace AZ
             if (auto serializeContext = azrtti_cast<AZ::SerializeContext*>(context))
             {
                 serializeContext->Class<DecalComponentConfig, ComponentConfig>()
-                    ->Version(2)
+                    ->Version(3)
                     ->Field("Attenuation Angle", &DecalComponentConfig::m_attenuationAngle)
                     ->Field("Opacity", &DecalComponentConfig::m_opacity)
+                    ->Field("BlendMode", &DecalComponentConfig::m_blendMode)
                     ->Field("Normal Map Opacity", &DecalComponentConfig::m_normalMapOpacity)
                     ->Field("SortKey", &DecalComponentConfig::m_sortKey)
                     ->Field("Decal Color", &DecalComponentConfig::m_decalColor)
@@ -48,9 +49,16 @@ namespace AZ
 
             if (AZ::BehaviorContext* behaviorContext = azrtti_cast<AZ::BehaviorContext*>(context))
             {
+                behaviorContext->Enum<static_cast<int>(DecalBlendMode::Alpha)>("DecalBlendMode_Alpha");
+                behaviorContext->Enum<static_cast<int>(DecalBlendMode::Multiply)>("DecalBlendMode_Multiply");
+                behaviorContext->Enum<static_cast<int>(DecalBlendMode::Add)>("DecalBlendMode_Add");
+                behaviorContext->Enum<static_cast<int>(DecalBlendMode::Screen)>("DecalBlendMode_Screen");
+                behaviorContext->Enum<static_cast<int>(DecalBlendMode::Overlay)>("DecalBlendMode_Overlay");
                 behaviorContext->EBus<DecalRequestBus>("DecalRequestBus")
                     ->Event("GetAttenuationAngle", &DecalRequestBus::Events::GetAttenuationAngle)
                     ->Event("SetAttenuationAngle", &DecalRequestBus::Events::SetAttenuationAngle)
+                    ->Event("GetBlendMode", &DecalRequestBus::Events::GetBlendMode)
+                    ->Event("SetBlendMode", &DecalRequestBus::Events::SetBlendMode)
                     ->Event("GetOpacity", &DecalRequestBus::Events::GetOpacity)
                     ->Event("SetOpacity", &DecalRequestBus::Events::SetOpacity)
                     ->Event("GetNormalMapOpacity", &DecalRequestBus::Events::GetNormalMapOpacity)
@@ -62,6 +70,7 @@ namespace AZ
                     ->Event("GetDecalColorFactor", &DecalRequestBus::Events::GetDecalColorFactor)
                     ->Event("SetDecalColorFactor", &DecalRequestBus::Events::SetDecalColorFactor)
                     ->VirtualProperty("AttenuationAngle", "GetAttenuationAngle", "SetAttenuationAngle")
+                    ->VirtualProperty("BlendMode", "GetBlendMode", "SetBlendMode")
                     ->VirtualProperty("Opacity", "GetOpacity", "SetOpacity")
                     ->VirtualProperty("NormalMapOpacity", "GetNormalMapOpacity", "SetNormalMapOpacity")
                     ->VirtualProperty("SortKey", "GetSortKey", "SetSortKey")
@@ -165,6 +174,7 @@ namespace AZ
         {
             AttenuationAngleChanged();
             OpacityChanged();
+            BlendModeChanged();
             NormalMapOpacityChanged();
             SortKeyChanged();
             DecalColorChanged();
@@ -203,6 +213,26 @@ namespace AZ
         {
             m_configuration.m_decalColorFactor = colorFactor;
             DecalColorFactorChanged();
+        }
+
+        DecalBlendMode DecalComponentController::GetBlendMode() const
+        {
+            return m_configuration.m_blendMode;
+        }
+
+        void DecalComponentController::SetBlendMode(DecalBlendMode blendMode)
+        {
+            m_configuration.m_blendMode = blendMode;
+            BlendModeChanged();
+        }
+
+        void DecalComponentController::BlendModeChanged()
+        {
+            DecalNotificationBus::Event(m_entityId, &DecalNotifications::OnBlendModeChanged, m_configuration.m_blendMode);
+            if (m_featureProcessor)
+            {
+                m_featureProcessor->SetDecalBlendMode(m_handle, m_configuration.m_blendMode);
+            }
         }
 
         float DecalComponentController::GetOpacity() const

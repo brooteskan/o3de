@@ -51,6 +51,22 @@ class DirectionalShadowCalculator
         m_worldPos = worldPos;
     }
 
+#if defined(ATOM_EXPLICIT_SHADOW_GRADIENTS)
+    // Derivatives of the actual receiver mapping, in world units per raster pixel.
+    // Normal derivatives include any material-specific receiver-normal mapping.
+    void SetReceiverDerivatives(float3 positionDx,float3 positionDy,float3 normalDx,float3 normalDy)
+    {
+        m_receiverPositionDx=positionDx;m_receiverPositionDy=positionDy;
+        m_receiverNormalDx=normalDx;m_receiverNormalDy=normalDy;
+        m_explicitReceiverDerivatives=true;
+    }
+
+    void DisableExplicitReceiverDerivatives()
+    {
+        m_explicitReceiverDerivatives=false;
+    }
+#endif
+
     void SetLightIndex(const int lightIndex)
     {
         m_lightIndex = lightIndex;
@@ -85,6 +101,11 @@ class DirectionalShadowCalculator
     float3 m_shadowPosDY[ViewSrg::MaxCascadeCount];
     real3 m_worldNormal;
     float3 m_worldPos;
+#if defined(ATOM_EXPLICIT_SHADOW_GRADIENTS)
+    float3 m_receiverPositionDx,m_receiverPositionDy;
+    float3 m_receiverNormalDx,m_receiverNormalDy;
+    bool m_explicitReceiverDerivatives;
+#endif
 
     bool m_receiverShadowPlaneBiasEnable;
     bool m_blendBetweenCascadesEnable;
@@ -184,13 +205,30 @@ void DirectionalShadowCalculator::ComputeShadowCoords()
 
         const float4 clipSpacePos = mul(lightViewToShadowmapMatrices[index], lightSpacePos);
         m_shadowCoords[index] = clipSpacePos.xyz / clipSpacePos.w;
+#if defined(ATOM_EXPLICIT_SHADOW_GRADIENTS)
+        if(m_explicitReceiverDerivatives&&m_receiverShadowPlaneBiasEnable)
+        {
+            const float normalBias=ViewSrg::m_directionalLightShadows[m_lightIndex].m_normalShadowBias;
+            const float3 receiverDx=m_receiverPositionDx+ComputeNormalShadowOffset(normalBias,m_receiverNormalDx,size);
+            const float3 receiverDy=m_receiverPositionDy+ComputeNormalShadowOffset(normalBias,m_receiverNormalDy,size);
+            const float4 clipDx=mul(lightViewToShadowmapMatrices[index],mul(worldToLightViewMatrices[index],float4(receiverDx,0)));
+            const float4 clipDy=mul(lightViewToShadowmapMatrices[index],mul(worldToLightViewMatrices[index],float4(receiverDy,0)));
+            // Include homogeneous division; the constant shadow depth bias has zero derivative.
+            m_shadowPosDX[index]=(clipDx.xyz-m_shadowCoords[index]*clipDx.w)/clipSpacePos.w;
+            m_shadowPosDY[index]=(clipDy.xyz-m_shadowCoords[index]*clipDy.w)/clipSpacePos.w;
+        }
+#endif
     }
 
     GetShadowCascadeRange(m_shadowCoords, m_cascadeCount, size, m_minCascade, m_maxCascade);
 
 // Todo: No ddx in compute, find a way to leverage world space normal for this
 #if !USING_COMPUTE_SHADER_DIRECTIONAL_LIGHT
-    if (m_receiverShadowPlaneBiasEnable)
+    if (m_receiverShadowPlaneBiasEnable
+#if defined(ATOM_EXPLICIT_SHADOW_GRADIENTS)
+        &&!m_explicitReceiverDerivatives
+#endif
+        )
     {
         for(int i = 0 ; i < m_cascadeCount; ++i)
         {

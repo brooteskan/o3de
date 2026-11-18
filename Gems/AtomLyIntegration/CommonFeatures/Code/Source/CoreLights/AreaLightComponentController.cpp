@@ -317,6 +317,7 @@ namespace AZ::Render
         if (m_lightShapeDelegate)
         {
             m_lightShapeDelegate->SetAttenuationRadius(m_configuration.m_attenuationRadius);
+            m_lightShapeDelegate->SetFalloffRate(m_configuration.m_falloffRate > 0.0f ? AZStd::clamp(m_configuration.m_falloffRate, 0.25f, 8.0f) : 1.0f);
         }
     }
     

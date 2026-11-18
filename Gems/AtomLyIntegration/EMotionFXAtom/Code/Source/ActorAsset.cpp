@@ -7,6 +7,7 @@
  */
 
 #include <ActorAsset.h>
+#include <LinearSkinningMatrices.h>
 #include <AtomActorInstance.h>
 
 #include <EMotionFX/Source/TransformData.h>
@@ -328,6 +329,17 @@ namespace AZ
             if (skinningMethod == EMotionFX::Integration::SkinningMethod::Linear)
             {
                 boneTransforms.resize_no_construct(numBoneTransforms * LinearSkinningFloatsPerBone);
+                const auto* skeleton = actorInstance->GetActor()->GetSkeleton();
+                const auto* pose = transforms->GetCurrentPose();
+                const auto* bindPose = actorInstance->GetActor()->GetBindPose();
+                AZStd::vector<AZ::Matrix3x4> affineMatrices;
+                if (Internal::RequiresAffineSkinning(*skeleton, *pose, *bindPose))
+                {
+                    affineMatrices.resize_no_construct(numBoneTransforms);
+                    Internal::BuildAffineSkinningMatrices(*skeleton, *pose, *bindPose, affineMatrices.data());
+                    skinningMatrices = affineMatrices.data();
+                }
+
                 for (size_t i = 0; i < numBoneTransforms; ++i)
                 {
                     skinningMatrices[i].StoreToRowMajorFloat12(&boneTransforms[i * LinearSkinningFloatsPerBone]);

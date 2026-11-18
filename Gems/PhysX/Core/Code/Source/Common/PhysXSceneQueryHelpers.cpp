@@ -89,11 +89,15 @@ namespace PhysX
 #if (PX_PHYSICS_VERSION_MAJOR == 5)
                 PHYSX_SCENE_READ_LOCK(pxActorShape.actor->getScene());
                 physx::PxBaseMaterial* pxBaseMaterial = pxActorShape.shape->getMaterialFromInternalFaceIndex(pxHit.faceIndex);
-                AZ_Assert(pxBaseMaterial->getConcreteType() == physx::PxConcreteType::eMATERIAL, "");
-                if (const auto* physicsMaterial = Utils::GetUserData(static_cast<physx::PxMaterial*>(pxBaseMaterial));
-                    physicsMaterial != nullptr)
+                // Material lookup can fail even though the geometry query produced a hit.
+                // Keep the geometric hit (used by editor selection) without a material flag.
+                if (pxBaseMaterial != nullptr && pxBaseMaterial->getConcreteType() == physx::PxConcreteType::eMATERIAL)
                 {
-                    hit.m_physicsMaterialId = physicsMaterial->GetId();
+                    if (const auto* physicsMaterial = Utils::GetUserData(static_cast<physx::PxMaterial*>(pxBaseMaterial));
+                        physicsMaterial != nullptr)
+                    {
+                        hit.m_physicsMaterialId = physicsMaterial->GetId();
+                    }
                 }
 #else
                 PHYSX_SCENE_READ_LOCK(pxHit.actor->getScene());

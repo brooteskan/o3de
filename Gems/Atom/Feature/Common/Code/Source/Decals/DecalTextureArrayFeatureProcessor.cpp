@@ -135,7 +135,10 @@ namespace AZ
                 DecalLocation decalLocation;
                 decalLocation.textureArrayIndex = m_decalData.GetData<0>(decal.GetIndex()).m_textureArrayIndex;
                 decalLocation.textureIndex = m_decalData.GetData<0>(decal.GetIndex()).m_textureIndex;
-                RemoveDecalFromTextureArrays(decalLocation);
+                if (m_decalData.GetData<0>(decal.GetIndex()).m_blendMode != DecalBlendMode::Composite)
+                {
+                    RemoveDecalFromTextureArrays(decalLocation);
+                }
 
                 m_decalData.RemoveIndex(decal.GetIndex());
                 m_deviceBufferNeedsUpdate = true;
@@ -225,6 +228,11 @@ namespace AZ
         uint32_t DecalTextureArrayFeatureProcessor::GetDecalCount() const
         {
             return m_decalBufferHandler.GetElementCount();
+        }
+
+        DecalData DecalTextureArrayFeatureProcessor::GetDecalData(DecalHandle handle) const
+        {
+            return handle.IsValid() ? m_decalData.GetData<0>(handle.GetIndex()) : DecalData{};
         }
 
         void DecalTextureArrayFeatureProcessor::SetDecalPosition(const DecalHandle handle, const AZ::Vector3& position)
@@ -342,6 +350,19 @@ namespace AZ
                 AZ_Warning(
                     "DecalTextureArrayFeatureProcessor", false,
                     "Invalid handle passed to DecalTextureArrayFeatureProcessor::SetDecalOpacity().");
+            }
+        }
+
+        void DecalTextureArrayFeatureProcessor::SetDecalBlendMode(DecalHandle handle, DecalBlendMode blendMode)
+        {
+            if (handle.IsValid())
+            {
+                m_decalData.GetData<0>(handle.GetIndex()).m_blendMode = blendMode;
+                m_deviceBufferNeedsUpdate = true;
+            }
+            else
+            {
+                AZ_Warning("DecalTextureArrayFeatureProcessor", false, "Invalid handle passed to SetDecalBlendMode().");
             }
         }
 
@@ -637,6 +658,10 @@ namespace AZ
             {
                 uint32_t dataIndex = sortedDecals[i];
                 const auto& decalData = dataVector[dataIndex];
+                if (decalData.m_opacity <= 0 && decalData.m_normalMapOpacity <= 0)
+                {
+                    continue;
+                }
                 AZ::Obb obb = AZ::Obb::CreateFromPositionRotationAndHalfLengths(
                     AZ::Vector3::CreateFromFloat3(decalData.m_position.data()),
                     AZ::Quaternion::CreateFromFloat4(decalData.m_quaternion.data()),
@@ -668,7 +693,7 @@ namespace AZ
             if (handle.IsValid())
             {
                 const DecalData& decalData = m_decalData.GetData<0>(handle.GetIndex());
-                if (decalData.m_textureArrayIndex != DecalData::UnusedIndex)
+                if (decalData.m_blendMode != DecalBlendMode::Composite && decalData.m_textureArrayIndex != DecalData::UnusedIndex)
                 {
                     const DecalTextureArray& textureArray = m_textureArrayList[decalData.m_textureArrayIndex].second;
                     material = textureArray.GetMaterialAssetId(decalData.m_textureIndex);

@@ -56,6 +56,8 @@ namespace PhysX
         AzPhysics::SimulatedBody* GetSimulatedBody() const;
 
         bool IsValid() const;
+        bool HasLimitedCharacterPush() const { return m_payload.m_limitedCharacterPush; }
+        void SetLimitedCharacterPush(bool limited) { m_payload.m_limitedCharacterPush = limited; }
 
     private:
         using PxActorUniquePtr = AZStd::unique_ptr<physx::PxActor, AZStd::function<void(physx::PxActor*)> >;
@@ -78,6 +80,7 @@ namespace PhysX
             Physics::RagdollNode* m_ragdollNode = nullptr;
             AzPhysics::SimulatedBody* m_articulationLink = nullptr;
             void* m_externalUserData = nullptr;
+            bool m_limitedCharacterPush = false;
         };
 
         Payload m_payload;

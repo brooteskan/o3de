@@ -18,6 +18,9 @@
 #include <Atom/RPI.Public/Pass/PassFilter.h>
 #include <Atom/RPI.Public/Pass/PassSystem.h>
 #include <Atom/RPI.Public/Pass/RasterPass.h>
+#include <Atom/RPI.Public/Pass/FullscreenTrianglePass.h>
+#include <Atom/RPI.Public/Shader/ShaderResourceGroup.h>
+#include <Common/ShaderAssetTestUtils.h>
 
 #include <Atom/RPI.Public/RenderPipeline.h>
 
@@ -29,6 +32,22 @@ namespace UnitTest
 {
     using namespace AZ;
     using namespace RPI;
+
+    class MissingShaderFullscreenPass final : public FullscreenTrianglePass
+    {
+    public:
+        AZ_CLASS_ALLOCATOR(MissingShaderFullscreenPass, AZ::SystemAllocator);
+        explicit MissingShaderFullscreenPass(const PassDescriptor& descriptor) : FullscreenTrianglePass(descriptor) {}
+        void InitializeForTest() { InitializeInternal(); }
+    };
+    class BindingValidationPass final : public RasterPass
+    {
+    public:
+        AZ_CLASS_ALLOCATOR(BindingValidationPass, AZ::SystemAllocator);
+        explicit BindingValidationPass(const PassDescriptor& descriptor) : RasterPass(descriptor) {}
+        void UseSrg(Data::Instance<ShaderResourceGroup> srg) { m_shaderResourceGroup = srg; }
+        using RenderPass::ResolveShaderInputImageIndex;
+    };
 
     // This class holds and sets up some data for the tests
     // This is it's own class so we can delete it before the teardown phase, otherwise
@@ -748,6 +767,43 @@ namespace UnitTest
     TEST_F(PassTests, ParentChildSlotTypeMismatch)
     {
         TestParentChildSlotTypeMismatch();
+    }
+
+    TEST_F(PassTests, FullscreenMissingShaderDisablesPassWithoutDereferencingIt)
+    {
+        auto passTemplate = AZStd::make_shared<PassTemplate>();
+        passTemplate->m_name = Name("MissingShaderRegression");
+        AZ_TEST_START_TRACE_SUPPRESSION;
+        Ptr<MissingShaderFullscreenPass> pass = aznew MissingShaderFullscreenPass(PassDescriptor(passTemplate->m_name, passTemplate));
+        EXPECT_FALSE(pass->GetShader());
+        pass->InitializeForTest();
+        EXPECT_FALSE(pass->IsEnabled());
+        AZ_TEST_STOP_TRACE_SUPPRESSION(2);
+    }
+
+    TEST_F(PassTests, ImageBindingsRecoverStaleNamedIndicesAndRejectOutOfRangeAutomaticIndices)
+    {
+        auto layout = RHI::ShaderResourceGroupLayout::Create();
+        layout->SetName(Name("BindingRegressionSrg")); layout->SetBindingSlot(0);
+        layout->AddShaderInput(RHI::ShaderInputImageDescriptor{Name("MyImage"), RHI::ShaderInputImageAccess::Read, RHI::ShaderInputImageType::Image2D, 1, 1, 1});
+        ASSERT_TRUE(layout->Finalize());
+        auto asset = CreateTestShaderAsset(Uuid::CreateRandom(), layout);
+        auto srg = ShaderResourceGroup::Create(asset, DefaultSupervariantIndex, layout->GetName());
+        ASSERT_TRUE(srg);
+        auto passTemplate = AZStd::make_shared<PassTemplate>(); passTemplate->m_name = Name("BindingRegression");
+        Ptr<BindingValidationPass> pass = aznew BindingValidationPass(PassDescriptor(passTemplate->m_name, passTemplate));
+        pass->UseSrg(srg);
+        PassAttachmentBinding binding;
+        binding.m_name = Name("TestAttachment"); binding.m_shaderInputName = Name("MyImage");
+        binding.m_shaderInputIndex = 8;
+        EXPECT_EQ(pass->ResolveShaderInputImageIndex(binding, 0).GetIndex(), 0);
+        EXPECT_EQ(binding.m_shaderInputIndex, 0);
+        AZ_TEST_START_TRACE_SUPPRESSION;
+        binding.m_shaderInputName = Name("AutoBind"); binding.m_shaderInputIndex = PassAttachmentBinding::ShaderInputAutoBind;
+        EXPECT_FALSE(pass->ResolveShaderInputImageIndex(binding, 1).IsValid());
+        binding.m_shaderInputName = Name("MyImage"); binding.m_shaderInputIndex = 0; binding.m_shaderInputArrayIndex = 1;
+        EXPECT_FALSE(pass->ResolveShaderInputImageIndex(binding, 0).IsValid());
+        AZ_TEST_STOP_TRACE_SUPPRESSION(1);
     }
 
     TEST_F(PassTests, FactoryDefaultCreators)

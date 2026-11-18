@@ -169,3 +169,13 @@ if(PAL_TRAIT_BUILD_HOST_TOOLS)
 
 endif()
 
+
+if(PAL_TRAIT_BUILD_TESTS_SUPPORTED)
+    ly_add_target(
+        NAME MiniAudio.Tests ${PAL_TRAIT_TEST_TARGET_TYPE} NAMESPACE Gem
+        FILES_CMAKE miniaudio_tests_files.cmake
+        BUILD_DEPENDENCIES PRIVATE AZ::AzTest AZ::AzCoreTestCommon
+            Gem::MiniAudio.Private.Object Gem::MiniAudio.API 3rdParty::miniaudio
+    )
+    ly_add_googletest(NAME Gem::MiniAudio.Tests LABELS REQUIRES_tiaf)
+endif()

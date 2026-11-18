@@ -10,7 +10,6 @@
 
 #include <AzCore/Asset/AssetCommon.h>
 #include <AzCore/Component/Component.h>
-#include <AzCore/Component/TickBus.h>
 #include <AzCore/Component/TransformBus.h>
 #include <MiniAudio/MiniAudioBus.h>
 #include <MiniAudio/MiniAudioPlaybackBus.h>
@@ -46,6 +45,8 @@ namespace MiniAudio
         void Play() override;
         void Stop() override;
         void Pause() override;
+        bool IsPlaying() const override;
+        bool IsPlaybackPending() const override;
         void SetVolumePercentage(float volume) override;
         float GetVolumePercentage() const override;
         void SetVolumeDecibels(float volumeDecibels) override;
@@ -77,6 +78,7 @@ namespace MiniAudio
 
         // MultiHandler
         void OnAssetReady(AZ::Data::Asset<AZ::Data::AssetData> asset) override;
+        void OnAssetError(AZ::Data::Asset<AZ::Data::AssetData> asset) override;
 
     private:
         AZ::EntityComponentIdPair m_entityComponentIdPair;
@@ -95,5 +97,8 @@ namespace MiniAudio
         void UnloadSound();
 
         AZStd::unique_ptr<ma_sound> m_sound;
+        AZ::Data::AssetId m_registeredSound;
+        bool m_playPending = false;
+        bool m_loadFailed = false;
     };
 } // namespace MiniAudio

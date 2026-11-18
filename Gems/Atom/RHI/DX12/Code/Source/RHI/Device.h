@@ -141,6 +141,9 @@ namespace AZ
 
             ID3D12DeviceX* GetDevice();
 
+            //! Optional SM 6.7 capability. Query this before enabling advanced texture operations.
+            bool SupportsAdvancedTextureOperations() const { return m_advancedTextureOperationsSupported; }
+
             MemoryPageAllocator& GetConstantMemoryPageAllocator();
 
             CommandQueueContext& GetCommandQueueContext();
@@ -232,6 +235,7 @@ namespace AZ
             AZStd::mutex m_samplerCacheMutex;
 
             bool m_isAftermathInitialized = false;
+            bool m_advancedTextureOperationsSupported = false;
 
             // device remover fence            
             RHI::Ptr<ID3D12Fence> m_deviceFence;

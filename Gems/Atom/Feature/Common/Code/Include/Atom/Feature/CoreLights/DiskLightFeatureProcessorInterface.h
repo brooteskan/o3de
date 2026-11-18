@@ -44,7 +44,7 @@ namespace AZ
             float m_affectsGIFactor = 1.0f;
             bool m_affectsGI = true;
             uint32_t m_lightingChannelMask = 1;
-            float m_padding0 = 0.0f;
+            float m_falloffRate = 1.0f;
         };
 
         //! DiskLightFeatureProcessorInterface provides an interface to acquire, release, and update a disk light. This is necessary for code outside of
@@ -75,6 +75,7 @@ namespace AZ
             virtual void SetDirection(LightHandle handle, const AZ::Vector3& lightDirection) = 0;
             //! Sets the radius in meters at which the provided LightHandle will no longer have an effect.
             virtual void SetAttenuationRadius(LightHandle handle, float attenuationRadius) = 0;
+            virtual void SetFalloffRate(LightHandle handle, float rate) = 0;
             //! Sets the disk radius for the provided LightHandle.
             virtual void SetDiskRadius(LightHandle handle, float radius) = 0;
 

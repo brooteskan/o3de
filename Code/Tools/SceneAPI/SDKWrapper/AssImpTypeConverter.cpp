@@ -34,6 +34,17 @@ namespace AZ
             return transform;
         }
 
+        SceneAPI::DataTypes::MatrixType AssImpTypeConverter::ToTransform(
+            const aiVector3D& scale, const aiQuaternion& rotation, const aiVector3D& translation)
+        {
+            // Local scale acts on the rotation matrix's columns (T * R * S).
+            // Assimp's scale/rotation/position constructor scales rows (T * S * R).
+            auto transform = ToTransform(aiMatrix4x4(rotation.GetMatrix()));
+            transform.MultiplyByScale(ToVector3(scale));
+            transform.SetTranslation(ToVector3(translation));
+            return transform;
+        }
+
         SceneAPI::DataTypes::Color AssImpTypeConverter::ToColor(const aiColor4D& color)
         {
             return AZ::SceneAPI::DataTypes::Color(color.r, color.g, color.b, color.a);

@@ -11,11 +11,21 @@ float SampleGoboTexture(int goboTexIndex, sampler goboSampler, float4x4 lightVie
 {
     if (goboTexIndex < ViewSrg::MaxGoboTextureCount)
     {
-        float4 positionInView = mul(lightViewProjectionMatrix, float4(positionWs, 1.0));
+        const float4 positionClip = mul(lightViewProjectionMatrix, float4(positionWs, 1.0));
+#if defined(ATOM_CUSTOM_GOBOTEXTURE_GRADIENTS)
+        // A singular projection has no finite spatial footprint. Use the full
+        // mask at its center instead of manufacturing a denominator or LOD.
+        if(!all(positionClip==positionClip)||any(abs(positionClip)>1e30f)||abs(positionClip.w)<=1e-12f)
+            return ViewSrg::m_goboTextures[goboTexIndex].SampleGrad(goboSampler,float2(.5f,.5f),float2(1,0),float2(0,1));
+#endif
+        float4 positionInView = positionClip;
         positionInView /= positionInView.w;
         float2 goboUv = float2((positionInView.x + 1.0)/2.0, (positionInView.y + 1.0)/2.0);
 
-        #ifdef CS_SAMPLERS
+        #if defined(ATOM_CUSTOM_GOBOTEXTURE_GRADIENTS)
+            const float4 gradients=ATOM_CUSTOM_GOBOTEXTURE_GRADIENTS(lightViewProjectionMatrix,positionClip);
+            return ViewSrg::m_goboTextures[goboTexIndex].SampleGrad(goboSampler,goboUv,gradients.xy,gradients.zw);
+        #elif defined(CS_SAMPLERS)
             return ViewSrg::m_goboTextures[goboTexIndex].SampleLevel(goboSampler, goboUv, 0);
         #else
             return ViewSrg::m_goboTextures[goboTexIndex].Sample(goboSampler, goboUv);

@@ -13,6 +13,7 @@
 #include <AzCore/RTTI/TypeSafeIntegral.h>
 
 struct ma_engine;
+struct ma_sound;
 
 namespace MiniAudio
 {
@@ -37,6 +38,12 @@ namespace MiniAudio
 
         //! @return the number of output channels for the sound engine
         virtual AZ::u32 GetChannelCount() const = 0;
+
+        //! Level sounds attach here; presentation sounds attach directly to the engine.
+        //! Group lifetime matches the engine. These methods are called on the owner thread.
+        virtual ma_sound* GetLevelSoundGroup() { return nullptr; }
+        virtual void SetLevelAudioEnabled(bool) {}
+        virtual bool IsLevelAudioEnabled() const { return true; }
     };
 
     class MiniAudioBusTraits

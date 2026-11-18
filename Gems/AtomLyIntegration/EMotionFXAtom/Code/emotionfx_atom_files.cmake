@@ -9,6 +9,7 @@
 set(FILES
     Source/ActorAsset.cpp
     Source/ActorAsset.h
+    Source/LinearSkinningMatrices.h
     Source/ActorSystemComponent.cpp
     Source/ActorSystemComponent.h
     Source/AtomBackend.h

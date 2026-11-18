@@ -129,6 +129,18 @@ namespace MiniAudio
 
         }
 
+        m_levelGroup = std::make_unique<ma_sound>();
+        result = ma_sound_group_init(m_engine.get(), 0, nullptr, m_levelGroup.get());
+        if (result != MA_SUCCESS)
+        {
+            m_levelGroup.reset();
+            ma_engine_uninit(m_engine.get());
+            ma_resource_manager_uninit(m_resourceManager.get());
+            m_engine.reset(); m_resourceManager.reset();
+            AZ_Error("MiniAudio", false, "Failed to initialize level audio group, error %d", result);
+            return;
+        }
+        SetLevelAudioEnabled(m_levelAudioEnabled);
         m_engineInitialized = true;
 
         MiniAudioRequestBus::Handler::BusConnect();
@@ -148,6 +160,8 @@ namespace MiniAudio
 
         if (m_engineInitialized)
         {
+            ma_sound_group_uninit(m_levelGroup.get());
+            m_levelGroup.reset();
             ma_engine_uninit(m_engine.get());
             ma_resource_manager_uninit(m_resourceManager.get());
             m_engine.reset();
@@ -160,6 +174,14 @@ namespace MiniAudio
     ma_engine* MiniAudioSystemComponent::GetSoundEngine()
     {
         return m_engine.get();
+    }
+
+    void MiniAudioSystemComponent::SetLevelAudioEnabled(bool enabled)
+    {
+        m_levelAudioEnabled = enabled;
+        if (!m_levelGroup) return;
+        if (enabled) ma_sound_group_start(m_levelGroup.get());
+        else ma_sound_group_stop(m_levelGroup.get());
     }
 
     void MiniAudioSystemComponent::SetGlobalVolume(float scale)

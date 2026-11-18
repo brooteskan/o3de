@@ -17,7 +17,8 @@ namespace MiniAudio
         if (auto serializeContext = azrtti_cast<AZ::SerializeContext*>(context))
         {
             serializeContext->Class<MiniAudioPlaybackComponentConfig>()
-                ->Version(4)
+                ->Version(5)
+                ->Field("PresentationAudio", &MiniAudioPlaybackComponentConfig::m_presentationAudio)
                 ->Field("Autoplay", &MiniAudioPlaybackComponentConfig::m_autoplayOnActivate)
                 ->Field("Sound", &MiniAudioPlaybackComponentConfig::m_sound)
                 ->Field("Volume", &MiniAudioPlaybackComponentConfig::m_volume)

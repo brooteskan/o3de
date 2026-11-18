@@ -83,7 +83,7 @@ struct DiskLight
     float m_affectsGIFactor;
     bool m_affectsGI;
     uint m_lightingChannelMask;
-    float m_padding;
+    float m_falloffRate;
 };
 
 // Capsule Lights
@@ -124,7 +124,7 @@ struct QuadLight
     float m_affectsGIFactor;
     bool m_affectsGI;
     uint m_lightingChannelMask;
-    float m_padding;
+    float m_falloffRate;
 };
 
 // Polygon Lights

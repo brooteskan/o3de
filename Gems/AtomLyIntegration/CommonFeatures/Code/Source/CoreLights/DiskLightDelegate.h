@@ -33,6 +33,7 @@ namespace AZ::Render
         float GetSurfaceArea() const override;
         float GetEffectiveSolidAngle() const override;
         float CalculateAttenuationRadius(float lightThreshold) const override;
+        void SetFalloffRate(float rate) override;
         void DrawDebugDisplay(
             const Transform& transform,
             const Color& color,

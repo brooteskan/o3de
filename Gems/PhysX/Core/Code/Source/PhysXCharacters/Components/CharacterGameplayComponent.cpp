@@ -7,6 +7,11 @@
  */
 
 #include <PhysXCharacters/Components/CharacterGameplayComponent.h>
+#include <AzFramework/Physics/Shape.h>
+#include <PhysX/MathConversion.h>
+#include <PhysX/NativeTypeIdentifiers.h>
+#include <PhysXCharacters/Components/CharacterGroundSupport.h>
+#include <extensions/PxShapeExt.h>
 #include <AzFramework/Physics/CharacterBus.h>
 #include <AzFramework/Physics/Common/PhysicsSimulatedBody.h>
 #include <AzFramework/Translation/TranslationDef.h>
@@ -124,9 +129,13 @@ namespace PhysX
             return true;
         }
 
-        // use an overlap query to see if there's any geometry immediately below the character's foot position
+        // Find walkable support at the feet without counting wall contact.
         if (auto* scene = character->GetScene())
         {
+            if (m_groundDetectionBoxHeight <= 0.0f)
+            {
+                return false;
+            }
             // use a box shape for the overlap, even if the character geometry is a capsule, to avoid difficulties with
             // the curved base of the capsule
             AZ::Vector3 footBoxDimensions(0.0f, 0.0f, m_groundDetectionBoxHeight);
@@ -144,19 +153,42 @@ namespace PhysX
 
             AZ::Transform footBoxTransform = AZ::Transform::CreateFromQuaternionAndTranslation(
                 AZ::Quaternion::CreateShortestArc(AZ::Vector3::CreateAxisZ(), character->GetUpDirection()), character->GetBasePosition());
-            AzPhysics::OverlapRequest overlapRequest =
-                AzPhysics::OverlapRequestHelpers::CreateBoxOverlapRequest(footBoxDimensions, footBoxTransform);
-            overlapRequest.m_collisionGroup = character->GetCollisionGroup();
-            overlapRequest.m_maxResults = 2;
-            AZ::EntityId entityId = GetEntityId();
-            AzPhysics::SceneQueryHits sceneQueryHits = scene->QueryScene(&overlapRequest);
-            return AZStd::any_of(
-                sceneQueryHits.m_hits.begin(),
-                sceneQueryHits.m_hits.end(),
-                [&entityId](const AzPhysics::SceneQueryHit& hit)
+            const physx::PxBoxGeometry footBox(PxMathConvert(footBoxDimensions * 0.5f));
+            const physx::PxTransform footPose = PxMathConvert(footBoxTransform);
+            const physx::PxVec3 up = pxController->getUpDirection();
+            const float minNormalDot = AZ::GetMax(pxController->getSlopeLimit(), 1e-4f);
+            const AZ::EntityId entityId = GetEntityId();
+            AzPhysics::OverlapRequest overlapRequest = AzPhysics::OverlapRequestHelpers::CreateBoxOverlapRequest(
+                footBoxDimensions, footBoxTransform,
+                [&](const AzPhysics::SimulatedBody* body, const Physics::Shape* shape)
                 {
-                    return hit.m_entityId != entityId;
+                    if (!shape || body->GetEntityId() == entityId)
+                    {
+                        return false;
+                    }
+                    const auto* pxShape = static_cast<const physx::PxShape*>(shape->GetNativePointer());
+                    if (!pxShape || pxShape->getFlags().isSet(physx::PxShapeFlag::eTRIGGER_SHAPE))
+                    {
+                        return false;
+                    }
+                    const auto* actor = pxShape->getActor();
+                    if (!actor)
+                    {
+                        // Shared shapes do not expose their actor through PxShape.
+                        const AZ::Crc32 nativeType = body->GetNativeType();
+                        if (nativeType == NativeTypeIdentifiers::RigidBody || nativeType == NativeTypeIdentifiers::RigidBodyStatic
+                            || nativeType == NativeTypeIdentifiers::ArticulationLink)
+                        {
+                            actor = static_cast<const physx::PxRigidActor*>(body->GetNativePointer());
+                        }
+                    }
+                    return actor && HasWalkableGroundSupport(
+                        footBox, footPose, pxShape->getGeometry(), physx::PxShapeExt::getGlobalPose(*pxShape, *actor),
+                        up, minNormalDot);
                 });
+            overlapRequest.m_collisionGroup = character->GetCollisionGroup();
+            overlapRequest.m_maxResults = 1;
+            return !scene->QueryScene(&overlapRequest).m_hits.empty();
         }
 
         return true;

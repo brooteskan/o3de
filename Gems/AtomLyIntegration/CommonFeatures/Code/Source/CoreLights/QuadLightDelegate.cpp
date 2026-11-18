@@ -35,6 +35,14 @@ namespace AZ::Render
         }
     }
 
+    void QuadLightDelegate::SetFalloffRate(float rate)
+    {
+        if (GetLightHandle().IsValid())
+        {
+            GetFeatureProcessor()->SetFalloffRate(GetLightHandle(), rate);
+        }
+    }
+
     float QuadLightDelegate::CalculateAttenuationRadius(float lightThreshold) const
     {
         // Calculate the radius at which the irradiance will be equal to cutoffIntensity.

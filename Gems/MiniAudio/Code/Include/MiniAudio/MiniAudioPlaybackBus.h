@@ -23,6 +23,10 @@ namespace MiniAudio
         virtual void Play() = 0;
         virtual void Stop() = 0;
         virtual void Pause() = 0;
+        //! True only while audio is playing, not once the clip reaches its end.
+        virtual bool IsPlaying() const = 0;
+        //! Play was requested while the sound asset is still loading.
+        virtual bool IsPlaybackPending() const = 0;
         virtual void SetLooping(bool loop) = 0;
         virtual bool IsLooping() const = 0;
         virtual void SetSoundAsset(AZ::Data::Asset<SoundAsset> soundAsset) = 0;

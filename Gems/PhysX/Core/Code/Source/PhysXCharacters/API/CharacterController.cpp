@@ -10,6 +10,7 @@
 #include <AzCore/std/smart_ptr/make_shared.h>
 #include <AzFramework/Physics/CollisionBus.h>
 #include <AzFramework/Physics/PhysicsScene.h>
+#include <AzFramework/Physics/Components/SimulatedBodyComponentBus.h>
 #include <AzFramework/Physics/Shape.h>
 #include <AzFramework/Physics/SystemBus.h>
 #include <AzFramework/Physics/Configuration/RigidBodyConfiguration.h>
@@ -243,7 +244,36 @@ namespace PhysX
         if (m_callbackManager)
         {
             m_callbackManager->SetControllerFilter(CollisionLayerBasedControllerFilter);
-            m_callbackManager->SetObjectPreFilter(CollisionLayerBasedObjectPreFilter);
+            m_callbackManager->SetOnShapeHit([this](const physx::PxControllerShapeHit& hit)
+            {
+                auto* body = hit.actor ? hit.actor->is<physx::PxRigidDynamic>() : nullptr;
+                if (body && body != m_ridingPlatformActor && hit.shape
+                    && !hit.shape->getFlags().isSet(physx::PxShapeFlag::eTRIGGER_SHAPE))
+                {
+                    m_push.Hit(*body, physx::PxVec3(float(hit.worldPos.x), float(hit.worldPos.y), float(hit.worldPos.z)), hit.worldNormal);
+                }
+            });
+            m_callbackManager->SetObjectPreFilter(
+                [this](const physx::PxFilterData& filterData, const physx::PxShape* shape,
+                    const physx::PxRigidActor* actor, physx::PxHitFlags& flags)
+                {
+                    if (m_push.Enabled() && shape->getFlags().isSet(physx::PxShapeFlag::eTRIGGER_SHAPE))
+                        return physx::PxQueryHitType::eNONE;
+                    if (actor == m_ridingPlatformActor || m_push.Enabled())
+                    {
+                        return Utils::Collision::ShouldCollide(filterData, shape->getSimulationFilterData())
+                            ? physx::PxQueryHitType::eBLOCK : physx::PxQueryHitType::eNONE;
+                    }
+                    return CollisionLayerBasedObjectPreFilter(filterData, shape, actor, flags);
+                });
+            m_callbackManager->SetObjectRidingBehavior(
+                [this](const physx::PxShape&, const physx::PxActor& actor)
+                {
+                    // Transport is supplied by the caller, exactly once, after simulation.
+                    return &actor == m_ridingPlatformActor
+                        ? physx::PxControllerBehaviorFlags(physx::PxControllerBehaviorFlag::eCCT_USER_DEFINED_RIDE)
+                        : physx::PxControllerBehaviorFlags(0);
+                });
         }
 
         m_orientation = AZ::Quaternion::CreateIdentity();
@@ -301,6 +331,7 @@ namespace PhysX
     {
         m_actorUserData = PhysX::ActorData(m_pxController->getActor());
         m_actorUserData.SetCharacter(this);
+        m_actorUserData.SetLimitedCharacterPush(m_push.Enabled());
         m_actorUserData.SetEntityId(characterConfig.m_entityId);
     }
 
@@ -326,6 +357,11 @@ namespace PhysX
                 return;
             }
             m_shadowBody = azdynamic_cast<AzPhysics::RigidBody*>(sceneInterface->GetSimulatedBodyFromHandle(m_sceneOwner, m_shadowBodyHandle));
+            if (m_shadowBody)
+            {
+                if (auto* data = Utils::GetUserData(static_cast<physx::PxActor*>(m_shadowBody->GetNativePointer())))
+                    data->SetLimitedCharacterPush(m_push.Enabled());
+            }
         }
     }
 
@@ -357,6 +393,7 @@ namespace PhysX
             return;
         }
 
+        SetRidingPlatform(AZ::EntityId());
         DestroyShadowBody();
         RemoveControllerFromScene();
 
@@ -405,6 +442,7 @@ namespace PhysX
 
     CharacterController::~CharacterController()
     {
+        SetRidingPlatform(AZ::EntityId());
         DestroyShadowBody();
         m_shape = nullptr; //shape has to go before m_pxController
 
@@ -415,6 +453,101 @@ namespace PhysX
         }
 
         m_pxController = nullptr;
+    }
+
+    bool CharacterController::SetRidingPlatform(AZ::EntityId platformEntity)
+    {
+        auto* sceneInterface = AZ::Interface<AzPhysics::SceneInterface>::Get();
+        if (!sceneInterface || !m_pxController)
+        {
+            return false;
+        }
+        AzPhysics::SimulatedBody* platform = nullptr;
+        if (platformEntity.IsValid())
+        {
+            AzPhysics::SimulatedBodyComponentRequestsBus::EventResult(platform, platformEntity,
+                &AzPhysics::SimulatedBodyComponentRequests::GetSimulatedBody);
+        }
+        const bool valid = platform && platform->m_sceneOwner == m_sceneOwner &&
+            platform->GetNativeType() == NativeTypeIdentifiers::RigidBody && platform->m_simulating;
+        const auto handle = valid ? platform->m_bodyHandle : AzPhysics::InvalidSimulatedBodyHandle;
+        auto* actor = valid ? static_cast<physx::PxRigidActor*>(platform->GetNativePointer()) : nullptr;
+        if (m_ridingPlatform == handle && m_ridingPlatformActor == actor)
+        {
+            return !platformEntity.IsValid() || valid;
+        }
+
+        auto* previousActor = m_ridingPlatformActor;
+        m_ridingPlatformRemovedHandler.Disconnect();
+        if (m_ridingPlatform != AzPhysics::InvalidSimulatedBodyHandle)
+        {
+            sceneInterface->UnsuppressCollisionEvents(m_sceneOwner, m_bodyHandle, m_ridingPlatform);
+            if (m_shadowBody)
+            {
+                sceneInterface->UnsuppressCollisionEvents(m_sceneOwner, m_shadowBodyHandle, m_ridingPlatform);
+            }
+        }
+        m_ridingPlatform = handle;
+        m_ridingPlatformActor = actor;
+        if (valid)
+        {
+            sceneInterface->SuppressCollisionEvents(m_sceneOwner, m_bodyHandle, handle);
+            if (m_shadowBody)
+            {
+                sceneInterface->SuppressCollisionEvents(m_sceneOwner, m_shadowBodyHandle, handle);
+            }
+            m_ridingPlatformRemovedHandler = AzPhysics::SceneEvents::OnSimulationBodyRemoved::Handler(
+                [this](AzPhysics::SceneHandle, AzPhysics::SimulatedBodyHandle removed)
+                {
+                    if (removed == m_ridingPlatform || removed == m_bodyHandle)
+                    {
+                        SetRidingPlatform(AZ::EntityId());
+                    }
+                });
+            sceneInterface->RegisterSimulationBodyRemovedHandler(m_sceneOwner, m_ridingPlatformRemovedHandler);
+        }
+        if (auto* scene = m_pxController->getScene())
+        {
+            PHYSX_SCENE_WRITE_LOCK(scene);
+            m_pxController->invalidateCache(); // The object filter's behavior changed.
+            // Re-evaluate both sides: resetting only the kinematic controller
+            // leaves a sleeping dynamic platform's suppressed contacts dormant.
+            if (previousActor && previousActor->getScene() == scene)
+            {
+                scene->resetFiltering(*previousActor);
+            }
+            if (actor && actor != previousActor && actor->getScene() == scene)
+            {
+                scene->resetFiltering(*actor);
+            }
+            scene->resetFiltering(*m_pxController->getActor());
+            if (m_shadowBody)
+            {
+                scene->resetFiltering(*static_cast<physx::PxRigidActor*>(m_shadowBody->GetNativePointer()));
+            }
+        }
+        return !platformEntity.IsValid() || valid;
+    }
+
+    bool CharacterController::SetPushStrength(float newtons)
+    {
+        const bool wasEnabled = m_push.Enabled();
+        if (!m_push.SetStrength(newtons)) return false;
+        if (wasEnabled == m_push.Enabled()) return true;
+        m_actorUserData.SetLimitedCharacterPush(m_push.Enabled());
+        if (auto* scene = m_pxController->getScene())
+        {
+            PHYSX_SCENE_WRITE_LOCK(scene);
+            m_pxController->invalidateCache();
+            scene->resetFiltering(*m_pxController->getActor());
+            if (m_shadowBody)
+            {
+                auto* shadow = static_cast<physx::PxActor*>(m_shadowBody->GetNativePointer());
+                if (auto* data = Utils::GetUserData(shadow)) data->SetLimitedCharacterPush(m_push.Enabled());
+                scene->resetFiltering(*shadow);
+            }
+        }
+        return true;
     }
 
     // Physics::Character
@@ -438,7 +571,25 @@ namespace PhysX
         }
 
         PHYSX_SCENE_WRITE_LOCK(m_pxController->getScene());
+        const AZ::Vector3 previousPosition = PxMathConvertExtended(m_pxController->getFootPosition());
         m_pxController->setFootPosition(PxMathConvertExtended(position));
+        auto* actor = m_pxController->getActor();
+        physx::PxTransform target;
+        if (actor->getKinematicTarget(target))
+        {
+            const auto current = actor->getGlobalPose();
+            if ((current.p - target.p).magnitudeSquared() > 0.0f || physx::PxAbs(current.q.dot(target.q)) < 0.999999f)
+            {
+                // Keep the SDK-computed position and up-axis orientation. This
+                // prevents teleport distance becoming a solver contact velocity.
+                actor->setGlobalPose(target);
+            }
+        }
+        if (!position.IsClose(previousPosition, 1e-5f))
+        {
+            // A teleported character must not keep riding its previous contact.
+            m_pxController->invalidateCache();
+        }
         if (m_shadowBody)
         {
             m_shadowBody->SetTransform(GetTransform());
@@ -660,7 +811,9 @@ namespace PhysX
             const AZ::Vector3 oldPosition = GetBasePosition();
             {
                 PHYSX_SCENE_WRITE_LOCK(m_pxController->getScene());
+                m_push.Begin(PxMathConvert(requestedMovement), deltaTime);
                 m_pxController->move(PxMathConvert(requestedMovement), m_minimumMovementDistance, deltaTime, m_pxControllerFilters);
+                m_push.Apply();
                 if (m_shadowBody)
                 {
                     m_shadowBody->SetKinematicTarget(GetTransform());

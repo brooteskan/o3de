@@ -10,6 +10,10 @@
 
 #include <AzFramework/Physics/Common/PhysicsSimulatedBody.h>
 #include <PhysX/NativeTypeIdentifiers.h>
+#include <characterkinematic/PxController.h>
+#include <PxRigidDynamic.h>
+#include <PhysX/Utils.h>
+#include <PhysX/UserDataTypes.h>
 
 namespace PhysX
 {
@@ -19,6 +23,11 @@ namespace PhysX
         const physx::PxActor* GetPxActor(const AzPhysics::SimulatedBody* simBody)
         {
             const AZ::Crc32& nativeType = simBody->GetNativeType();
+            if (nativeType == NativeTypeIdentifiers::CharacterController)
+            {
+                auto* controller = static_cast<physx::PxController*>(simBody->GetNativePointer());
+                return controller ? controller->getActor() : nullptr;
+            }
             if (nativeType != NativeTypeIdentifiers::RigidBody &&
                 nativeType != NativeTypeIdentifiers::RigidBodyStatic)
             {
@@ -104,6 +113,22 @@ namespace PhysX
             return physx::PxFilterFlag::eSUPPRESS;
         }
 
+        // Retain detection and trigger notifications, but let the character's
+        // explicit force budget own dynamic-body response, including shadow shapes.
+        const auto limited = [](const physx::PxActor* actor)
+        {
+            const auto* data = Utils::GetUserData(actor);
+            return data && data->HasLimitedCharacterPush();
+        };
+        const auto dynamic = [](const physx::PxActor* actor)
+        {
+            const auto* body = actor->is<physx::PxRigidDynamic>();
+            return body && !body->getRigidBodyFlags().isSet(physx::PxRigidBodyFlag::eKINEMATIC);
+        };
+        if ((limited(actor0) && dynamic(actor1)) || (limited(actor1) && dynamic(actor0)))
+        {
+            pairFlags.clear(physx::PxPairFlag::eSOLVE_CONTACT);
+        }
         return physx::PxFilterFlag::eDEFAULT;
     }
 

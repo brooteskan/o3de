@@ -85,6 +85,26 @@ namespace AZ
                 return resultCode;
             }
 
+            static_assert(TG_DX12_SHADER_MODEL == 62 || TG_DX12_SHADER_MODEL == 67);
+            const auto requiredModel = TG_DX12_SHADER_MODEL == 67 ? D3D_SHADER_MODEL_6_7 : D3D_SHADER_MODEL_6_2;
+            D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{requiredModel};
+            const HRESULT modelResult = GetDevice()->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof(shaderModel));
+            if (FAILED(modelResult) || shaderModel.HighestShaderModel < requiredModel)
+            {
+                AZ_Error("DX12", false,
+                    "This build requires Shader Model %d.%d. Update the graphics driver or rebuild the engine and shader assets with -DTG_DX12_SHADER_MODEL=6_2. "
+                    "CheckFeatureSupport returned 0x%08x; reported shader model 0x%x.",
+                    TG_DX12_SHADER_MODEL / 10, TG_DX12_SHADER_MODEL % 10,
+                    static_cast<unsigned>(modelResult), static_cast<unsigned>(shaderModel.HighestShaderModel));
+                return RHI::ResultCode::Fail;
+            }
+            D3D12_FEATURE_DATA_D3D12_OPTIONS14 textureOptions{};
+            m_advancedTextureOperationsSupported = SUCCEEDED(GetDevice()->CheckFeatureSupport(
+                D3D12_FEATURE_D3D12_OPTIONS14, &textureOptions, sizeof(textureOptions))) && textureOptions.AdvancedTextureOpsSupported;
+            AZ_Printf("DX12", "TG DX12 shader model %d.%d; advanced texture operations: %s.\n",
+                TG_DX12_SHADER_MODEL / 10, TG_DX12_SHADER_MODEL % 10,
+                m_advancedTextureOperationsSupported ? "supported" : "unavailable");
+
 #ifdef USE_AMD_D3D12MA
             resultCode = InitD3d12maAllocator();
             if (resultCode != RHI::ResultCode::Success)

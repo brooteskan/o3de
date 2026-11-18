@@ -46,6 +46,8 @@ namespace PhysX
                 ->Attribute(AZ::Script::Attributes::Storage, AZ::Script::Attributes::StorageType::RuntimeOwn)
                 ->Attribute(AZ::Edit::Attributes::Category, "PhysX")
                 ->Event("Resize", &CharacterControllerRequests::Resize)
+                ->Event("SetRidingPlatform", &CharacterControllerRequests::SetRidingPlatform)
+                ->Event("SetPushStrength", &CharacterControllerRequests::SetPushStrength)
                 ->Event("GetHeight", &CharacterControllerRequests::GetHeight, "Get Height")
                 ->Event("SetHeight", &CharacterControllerRequests::SetHeight, "Set Height")
                 ->Event("GetRadius", &CharacterControllerRequests::GetRadius, "Get Radius")
@@ -56,6 +58,18 @@ namespace PhysX
                 ->Event("SetHalfForwardExtent", &CharacterControllerRequests::SetHalfForwardExtent, "Set Half Forward Extent")
                 ;
         }
+    }
+
+    bool CharacterControllerComponent::SetPushStrength(float newtons)
+    {
+        auto* controller = GetController();
+        return controller && controller->SetPushStrength(newtons);
+    }
+
+    bool CharacterControllerComponent::SetRidingPlatform(AZ::EntityId platformEntity)
+    {
+        auto* controller = GetController();
+        return controller && controller->SetRidingPlatform(platformEntity);
     }
 
     CharacterControllerComponent::CharacterControllerComponent() = default;

@@ -8,7 +8,7 @@ struct Decal
     float3 m_halfSize;
     float m_angleAttenuation;
     float m_normalMapOpacity;
-    uint m_sortKeyPacked;
+    uint m_sortKeyPacked; // Sort key bits 0..7, DecalBlendMode bits 8..15.
     uint m_textureArrayIndex;
     uint m_textureIndex;
     float3 m_decalColor;

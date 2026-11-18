@@ -384,6 +384,7 @@ namespace AZ
 
             // render draw packet
             RHI::ConstPtr<RHI::DrawPacket> m_drawPacket;
+            RHI::ConstPtr<RHI::PipelineState> m_drawPacketPipelineState;
 
             // sort key for the draw item
             const RHI::DrawItemSortKey InvalidSortKey = static_cast<RHI::DrawItemSortKey>(-1);

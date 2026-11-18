@@ -211,22 +211,22 @@ namespace AZ
 
         void FullscreenTrianglePass::InitializeInternal()
         {
-            BuildRenderAttachmentConfiguration();
-            if (m_shader->GetSupervariantIndex() != m_shader->GetAsset()->GetSupervariantIndex(GetSuperVariantName()))
+            // Asset refresh or a failed load can leave this pass without a shader.
+            if (m_shader && m_shader->GetSupervariantIndex() != m_shader->GetAsset()->GetSupervariantIndex(GetSuperVariantName()))
             {
                 LoadShader();
             }
 
-            RenderPass::InitializeInternal();
-            
-            ShaderReloadDebugTracker::ScopedSection reloadSection("{%p}->FullscreenTrianglePass::InitializeInternal", this);
-
             if (m_shader == nullptr)
             {
-                AZ_Error("PassSystem", false, "[FullscreenTrianglePass]: Shader not loaded!");
+                AZ_Error("PassSystem", false, "[FullscreenTrianglePass '%s']: Shader not loaded; pass disabled until its pipeline is rebuilt.", GetPathName().GetCStr());
+                SetEnabled(false);
                 return;
             }
 
+            BuildRenderAttachmentConfiguration();
+            RenderPass::InitializeInternal();
+            ShaderReloadDebugTracker::ScopedSection reloadSection("{%p}->FullscreenTrianglePass::InitializeInternal", this);
             BuildDrawItem();
         }
 

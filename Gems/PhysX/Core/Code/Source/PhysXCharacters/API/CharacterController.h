@@ -10,10 +10,12 @@
 #include <AzFramework/Physics/Character.h>
 #include <PhysX/UserDataTypes.h>
 #include <PxPhysicsAPI.h>
+#include <PhysXCharacters/API/CharacterPush.h>
 
 #include <AzFramework/Physics/Collision/CollisionGroups.h>
 #include <AzFramework/Physics/Collision/CollisionLayers.h>
 #include <AzFramework/Physics/Common/PhysicsTypes.h>
+#include <AzFramework/Physics/Common/PhysicsEvents.h>
 
 namespace PhysX
 {
@@ -181,6 +183,7 @@ namespace PhysX
 
         CharacterControllerCallbackManager* GetCallbackManager();
         void SetFilterFlags(physx::PxQueryFlags filterFlags);
+        bool SetRidingPlatform(AZ::EntityId platformEntity);
 
         // Physics::Character
         AZ::Vector3 GetBasePosition() const override;
@@ -223,6 +226,7 @@ namespace PhysX
 
         // CharacterController specific
         void Resize(float height);
+        bool SetPushStrength(float newtons);
         float GetHeight() const;
         void SetHeight(float height);
         float GetRadius() const;
@@ -243,6 +247,7 @@ namespace PhysX
         void RemoveControllerFromScene();
         void UpdateFilterLayerAndGroup(AzPhysics::CollisionLayer collisionLayer, AzPhysics::CollisionGroup collisionGroup);
 
+        CharacterPush m_push;
         physx::PxController* m_pxController = nullptr; ///< The underlying PhysX controller.
         float m_minimumMovementDistance = 0.0f; ///< To avoid jittering, the controller will not attempt to move distances below this.
         AZ::Vector3 m_requestedVelocityForTick = AZ::Vector3::CreateZero(); ///< Used to accumulate velocity requests which last for a tick.
@@ -261,6 +266,9 @@ namespace PhysX
         AZStd::unique_ptr<CharacterControllerCallbackManager>
             m_callbackManager; ///< Manages callbacks for collision filtering, collision notifications, and handling riding on objects.
         AZ::Quaternion m_orientation; ///< The orientation of the character.
+        AzPhysics::SimulatedBodyHandle m_ridingPlatform = AzPhysics::InvalidSimulatedBodyHandle;
+        physx::PxRigidActor* m_ridingPlatformActor = nullptr;
+        AzPhysics::SceneEvents::OnSimulationBodyRemoved::Handler m_ridingPlatformRemovedHandler;
     };
 
     //! Example implementation of controller-controller filtering callback.

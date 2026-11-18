@@ -49,7 +49,7 @@ namespace AZ
             float m_affectsGIFactor = 1.0f;
             bool m_affectsGI = true;
             uint32_t m_lightingChannelMask = 1;
-            float m_padding0 = 0.0f;
+            float m_falloffRate = 1.0f;
 
             void SetFlag(QuadLightFlag::Flag flag, bool value)
             {
@@ -89,6 +89,7 @@ namespace AZ
             virtual void SetUseFastApproximation(LightHandle handle, bool useFastApproximation) = 0;
             //! Sets the radius in meters at which the provided LightHandle will no longer have an effect.
             virtual void SetAttenuationRadius(LightHandle handle, float attenuationRadius) = 0;
+            virtual void SetFalloffRate(LightHandle handle, float rate) = 0;
             //! Sets the quad radius for the provided LightHandle.
             virtual void SetQuadDimensions(LightHandle handle, float width, float height) = 0;
             //! Specifies if this light affects the diffuse global illumination in the scene.

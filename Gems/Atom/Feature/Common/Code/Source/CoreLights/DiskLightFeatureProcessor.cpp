@@ -221,6 +221,13 @@ namespace AZ
             m_deviceBufferNeedsUpdate = true;
         }
 
+        void DiskLightFeatureProcessor::SetFalloffRate(LightHandle handle, float rate)
+        {
+            AZ_Assert(handle.IsValid(), "Invalid light handle");
+            m_lightData.GetData<0>(handle.GetIndex()).m_falloffRate = rate;
+            m_deviceBufferNeedsUpdate = true;
+        }
+
         void DiskLightFeatureProcessor::SetAttenuationRadius(LightHandle handle, float attenuationRadius)
         {
             AZ_Assert(handle.IsValid(), "Invalid LightHandle passed to DiskLightFeatureProcessor::SetAttenuationRadius().");

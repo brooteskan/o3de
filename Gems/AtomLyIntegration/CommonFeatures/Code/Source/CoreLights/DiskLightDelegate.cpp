@@ -21,6 +21,14 @@ namespace AZ::Render
         InitBase(entityId);
     }
 
+    void DiskLightDelegate::SetFalloffRate(float rate)
+    {
+        if (GetLightHandle().IsValid())
+        {
+            GetFeatureProcessor()->SetFalloffRate(GetLightHandle(), rate);
+        }
+    }
+
     float DiskLightDelegate::CalculateAttenuationRadius(float lightThreshold) const
     {
         // Calculate the radius at which the irradiance will be equal to cutoffIntensity.

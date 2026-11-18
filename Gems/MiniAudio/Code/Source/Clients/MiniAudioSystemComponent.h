@@ -51,9 +51,14 @@ namespace MiniAudio
         float GetGlobalVolume() const override;
         void SetGlobalVolumeInDecibels(float decibels) override;
         AZ::u32 GetChannelCount() const override;
+        ma_sound* GetLevelSoundGroup() override { return m_levelGroup.get(); }
+        void SetLevelAudioEnabled(bool enabled) override;
+        bool IsLevelAudioEnabled() const override { return m_levelAudioEnabled; }
 
     private:
         std::unique_ptr<ma_engine> m_engine;
+        std::unique_ptr<ma_sound> m_levelGroup;
+        bool m_levelAudioEnabled{true};
         std::unique_ptr<ma_resource_manager> m_resourceManager;
         bool m_engineInitialized = false;
 

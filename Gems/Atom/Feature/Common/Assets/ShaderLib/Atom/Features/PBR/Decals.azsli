@@ -35,9 +35,30 @@ real GetDecalAttenuation(real3 surfNormal, real3 decalUp, real decalAngleAttenut
     return lerp(1, dotAtten, decalAngleAttenutation);
 }
 
-void ApplyDecal(uint currDecalIndex, inout Surface surface)
+// Modes match DecalBlendMode. Operate on linear working-space surface color.
+real3 BlendDecalColor(real3 base, real3 decal, uint mode)
 {
-    Decal decal = ViewSrg::m_decals[currDecalIndex];
+    if (mode == 1) // Multiply
+    {
+        return base * decal;
+    }
+    if (mode == 2) // Add (bounded base-color reflectance)
+    {
+        return saturate(base + decal);
+    }
+    if (mode == 3) // Screen
+    {
+        return 1.0 - (1.0 - base) * (1.0 - decal);
+    }
+    if (mode == 4) // Overlay, selected by the underlying surface color
+    {
+        return TextureBlend_Overlay(base, decal);
+    }
+    return decal; // Alpha, also the fallback for unknown modes
+}
+
+void ApplyDecalData(Decal decal, inout Surface surface, float3 positionDx, float3 positionDy)
+{
 
     real3x3 decalRot = MatrixFromQuaternion(real4(decal.m_quaternion));
     decalRot = transpose(decalRot);
@@ -59,6 +80,8 @@ void ApplyDecal(uint currDecalIndex, inout Surface surface)
         decalUVW.y *= -1;
 
         real3 decalUV = real3(decalUVW.xy * 0.5 + 0.5, textureIndex);
+        float2 decalDx = mul(decalRot, positionDx).xy / decal.m_halfSize.xy * float2(.5, -.5);
+        float2 decalDy = mul(decalRot, positionDy).xy / decal.m_halfSize.xy * float2(.5, -.5);
         
         float4 baseMap = 0;
         float2 normalMap = 0;
@@ -68,24 +91,24 @@ void ApplyDecal(uint currDecalIndex, inout Surface surface)
         switch(textureArrayIndex)
         {
             case 0:
-                baseMap = ViewSrg::m_decalTextureArrayDiffuse0.Sample(PassSrg::LinearSampler, decalUV);
-                normalMap = ViewSrg::m_decalTextureArrayNormalMaps0.Sample(PassSrg::LinearSampler, decalUV).rg;
+                baseMap = ViewSrg::m_decalTextureArrayDiffuse0.SampleGrad(PassSrg::LinearSampler, decalUV, decalDx, decalDy);
+                normalMap = ViewSrg::m_decalTextureArrayNormalMaps0.SampleGrad(PassSrg::LinearSampler, decalUV, decalDx, decalDy).rg;
             break;
             case 1:
-                baseMap = ViewSrg::m_decalTextureArrayDiffuse1.Sample(PassSrg::LinearSampler, decalUV);
-                normalMap = ViewSrg::m_decalTextureArrayNormalMaps1.Sample(PassSrg::LinearSampler, decalUV).rg;
+                baseMap = ViewSrg::m_decalTextureArrayDiffuse1.SampleGrad(PassSrg::LinearSampler, decalUV, decalDx, decalDy);
+                normalMap = ViewSrg::m_decalTextureArrayNormalMaps1.SampleGrad(PassSrg::LinearSampler, decalUV, decalDx, decalDy).rg;
             break;
             case 2:
-                baseMap = ViewSrg::m_decalTextureArrayDiffuse2.Sample(PassSrg::LinearSampler, decalUV);
-                normalMap = ViewSrg::m_decalTextureArrayNormalMaps2.Sample(PassSrg::LinearSampler, decalUV).rg;
+                baseMap = ViewSrg::m_decalTextureArrayDiffuse2.SampleGrad(PassSrg::LinearSampler, decalUV, decalDx, decalDy);
+                normalMap = ViewSrg::m_decalTextureArrayNormalMaps2.SampleGrad(PassSrg::LinearSampler, decalUV, decalDx, decalDy).rg;
             break;
             case 3:
-                baseMap = ViewSrg::m_decalTextureArrayDiffuse3.Sample(PassSrg::LinearSampler, decalUV);
-                normalMap = ViewSrg::m_decalTextureArrayNormalMaps3.Sample(PassSrg::LinearSampler, decalUV).rg;
+                baseMap = ViewSrg::m_decalTextureArrayDiffuse3.SampleGrad(PassSrg::LinearSampler, decalUV, decalDx, decalDy);
+                normalMap = ViewSrg::m_decalTextureArrayNormalMaps3.SampleGrad(PassSrg::LinearSampler, decalUV, decalDx, decalDy).rg;
             break;
             case 4:
-                baseMap = ViewSrg::m_decalTextureArrayDiffuse4.Sample(PassSrg::LinearSampler, decalUV);
-                normalMap = ViewSrg::m_decalTextureArrayNormalMaps4.Sample(PassSrg::LinearSampler, decalUV).rg;
+                baseMap = ViewSrg::m_decalTextureArrayDiffuse4.SampleGrad(PassSrg::LinearSampler, decalUV, decalDx, decalDy);
+                normalMap = ViewSrg::m_decalTextureArrayNormalMaps4.SampleGrad(PassSrg::LinearSampler, decalUV, decalDx, decalDy).rg;
             break;            
         }
         
@@ -94,11 +117,29 @@ void ApplyDecal(uint currDecalIndex, inout Surface surface)
 
         bool useTexture = true;
         real3 blendedBaseColor = BlendBaseColor(real3(baseMap.rgb), real3(decal.m_decalColor), real(decal.m_decalColorFactor), TextureBlendMode::Multiply, useTexture);
-        surface.albedo = lerp(surface.albedo, real3(blendedBaseColor.rgb), albedoOpacity);
+        const uint blendMode = (decal.m_sortKeyPacked >> 8) & 0xFF;
+        const real3 decalColor = BlendDecalColor(surface.albedo, real3(blendedBaseColor.rgb), blendMode);
+        surface.albedo = lerp(surface.albedo, decalColor, albedoOpacity);
 
         const real normalOpacity = real(baseMap.a) * real(decal.m_normalMapOpacity) * decalAttenuation;
         const real3 normalMapWS = GetWorldSpaceNormal(real2(normalMap), decalRot[2], decalRot[0], decalRot[1], 1.0);
         surface.normal = normalize(lerp(surface.normal, normalMapWS, normalOpacity));
+    }
+}
+
+#include <Atom/Features/PBR/DecalComposite.azsli>
+
+void ApplyDecal(uint currDecalIndex, inout Surface surface)
+{
+    Decal decal = ViewSrg::m_decals[currDecalIndex];
+    float3 positionDx=ddx(surface.position), positionDy=ddy(surface.position);
+    if (((decal.m_sortKeyPacked >> 8) & 0xFF) == 5)
+    {
+        ApplyPaintComposite(decal, surface, positionDx, positionDy);
+    }
+    else
+    {
+        ApplyDecalData(decal, surface, positionDx, positionDy);
     }
 }
 #else

@@ -587,8 +587,8 @@ namespace AZ
                             return Events::ProcessingResult::Failure;
                         }
                         
-                        aiMatrix4x4 transform(scale, rotation, position);
-                        DataTypes::MatrixType animTransform = AssImpSDKWrapper::AssImpTypeConverter::ToTransform(transform);
+                        DataTypes::MatrixType animTransform =
+                            AssImpSDKWrapper::AssImpTypeConverter::ToTransform(scale, rotation, position);
 
                         context.m_sourceSceneSystem.SwapTransformForUpAxis(animTransform);
                         context.m_sourceSceneSystem.ConvertBoneUnit(animTransform);

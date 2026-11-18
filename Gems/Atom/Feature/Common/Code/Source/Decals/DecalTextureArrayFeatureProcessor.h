@@ -60,6 +60,7 @@ namespace AZ
 
             const Data::Instance<RPI::Buffer> GetDecalBuffer() const override;
             uint32_t GetDecalCount() const override;
+            DecalData GetDecalData(DecalHandle handle) const override;
 
             //! Sets the position of the decal
             void SetDecalPosition(const DecalHandle handle, const AZ::Vector3& position) override;
@@ -87,6 +88,7 @@ namespace AZ
 
             //! Sets the decal sort key. Decals with a larger sort key appear over top of smaller sort keys.
             void SetDecalSortKey(const DecalHandle handle, uint8_t sortKey) override;
+            void SetDecalBlendMode(const DecalHandle handle, DecalBlendMode blendMode) override;
 
             //! Sets the transform of the decal
             //! Equivalent to calling SetDecalPosition() + SetDecalOrientation() + SetDecalHalfSize()

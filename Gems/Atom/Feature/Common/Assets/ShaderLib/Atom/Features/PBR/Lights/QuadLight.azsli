@@ -119,6 +119,11 @@ class QuadLightUtil_PBR
                 // Smoothly adjusts the light intensity so it reaches 0 at light.m_attenuationRadius distance
         float radiusAttenuation = 1.0 - (m_falloff * m_falloff);
         radiusAttenuation = radiusAttenuation * radiusAttenuation;
+        if (light.m_falloffRate != 1.0)
+        {
+            // Change distance decay independently of the outer cutoff.
+            radiusAttenuation *= pow(1.0 + m_distanceToLight2, 0.5 * (1.0 - light.m_falloffRate));
+        }
 
         float3 left = light.m_leftDir * light.m_halfWidth;
         float3 up = light.m_upDir * light.m_halfHeight;

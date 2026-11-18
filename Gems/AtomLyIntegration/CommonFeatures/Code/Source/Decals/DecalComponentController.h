@@ -54,6 +54,8 @@ namespace AZ
             void SetDecalColor(const AZ::Vector3& color) override;
             float GetDecalColorFactor() const override;
             void SetDecalColorFactor(float colorFactor) override;
+            DecalBlendMode GetBlendMode() const override;
+            void SetBlendMode(DecalBlendMode blendMode) override;
             float GetOpacity() const override;
             void SetOpacity(float opacity) override;
             float GetNormalMapOpacity() const override;
@@ -68,6 +70,7 @@ namespace AZ
             void DecalColorChanged();
             void DecalColorFactorChanged();
             void OpacityChanged();
+            void BlendModeChanged();
             void NormalMapOpacityChanged();
             void SortKeyChanged();
             void MaterialChanged();

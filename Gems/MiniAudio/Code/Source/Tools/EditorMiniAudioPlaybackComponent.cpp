@@ -92,6 +92,8 @@ namespace MiniAudio
                         &MiniAudioPlaybackComponentConfig::m_autoplayOnActivate,
                         QT_TRANSLATE_NOOP("MiniAudio", "Autoplay"),
                         QT_TRANSLATE_NOOP("MiniAudio", "Plays the sound on activation of the component."))
+                    ->DataElement(AZ::Edit::UIHandlers::Default, &MiniAudioPlaybackComponentConfig::m_presentationAudio,
+                        "Presentation audio", "Play during titles and narration, independently of level reveal.")
                     ->DataElement(AZ::Edit::UIHandlers::Default, &MiniAudioPlaybackComponentConfig::m_loop,
                         QT_TRANSLATE_NOOP("MiniAudio", "Loop"),
                         QT_TRANSLATE_NOOP("MiniAudio", "Loops the sound."))

@@ -39,6 +39,7 @@ namespace MiniAudio
         //! If true, automatically play when the entity activates, useful for
         //! environment audio.
         bool m_autoplayOnActivate = false;
+        bool m_presentationAudio = false;
 
         //! Playback volume represented as a percentage
         float m_volume = 100.f;

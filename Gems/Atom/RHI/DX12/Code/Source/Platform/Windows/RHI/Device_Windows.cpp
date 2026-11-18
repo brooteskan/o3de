@@ -18,6 +18,7 @@
 #include <AzCore/std/string/conversions.h>
 #include <Atom/RHI/Debug.h>
 #include <Atom/RHI/ValidationLayer.h>
+#include <Atom/RHI/RHIUtils.h>
 #include <Atom/RHI/FactoryManagerBus.h>
 #include <comdef.h>
 
@@ -208,7 +209,12 @@ namespace AZ
                     EnableGPUBasedValidation();
                 }
 
-                // DRED has a perf cost on some drivers/hw so only enable it if RHI validation is enabled.
+            }
+
+            // Allow opt-in breadcrumbs without the debug layer's validation overhead.
+            if (validationMode != RHI::ValidationMode::Disabled ||
+                RHI::GetCommandLineValue("rhi-device-dred") == "enable")
+            {
 #ifdef __ID3D12DeviceRemovedExtendedDataSettings1_INTERFACE_DEFINED__
                 Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedDataSettings1> pDredSettings;
 #else

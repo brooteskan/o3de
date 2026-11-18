@@ -52,6 +52,8 @@ namespace AZ
             AZ::Color m_color = AZ::Color::CreateOne();
             float m_intensity = 100.0f;
             float m_attenuationRadius = 0.0f;
+            float m_falloffRate = 1.0f;
+            bool m_lockBlenderExport = false;
             PhotometricUnit m_intensityMode = PhotometricUnit::Lumen;
             LightAttenuationRadiusMode m_attenuationRadiusMode = LightAttenuationRadiusMode::Automatic;
             bool m_lightEmitsBothDirections = false;
@@ -88,6 +90,8 @@ namespace AZ
 
             //! Returns true if the light type is anything other than unknown.
             bool LightTypeIsSelected() const;
+
+            bool SupportsFalloffRate() const { return m_lightType == LightType::SpotDisk || m_lightType == LightType::Quad; }
 
             //! Returns true if m_attenuationRadiusMode is set to LightAttenuationRadiusMode::Automatic
             bool IsAttenuationRadiusModeAutomatic() const;

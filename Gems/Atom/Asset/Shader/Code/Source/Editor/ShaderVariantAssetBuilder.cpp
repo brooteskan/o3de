@@ -123,6 +123,7 @@ namespace AZ
                 AZ_TraceContext("For platform", info.m_identifier.data());
 
                 AssetBuilderSDK::JobDescriptor jobDescriptor;
+                jobDescriptor.m_additionalFingerprintInfo = AZStd::string::format("TG.DX12.SM.%d.v1", TG_DX12_SHADER_MODEL);
 
                 // The ShaderVariantTreeAsset is high priority, but must be generated after the ShaderAsset 
                 jobDescriptor.m_priority = 1;
@@ -197,6 +198,7 @@ namespace AZ
                 AZ_TraceContext("For platform", info.m_identifier.data());
             
                 AssetBuilderSDK::JobDescriptor jobDescriptor;
+                jobDescriptor.m_additionalFingerprintInfo = AZStd::string::format("TG.DX12.SM.%d.v1", TG_DX12_SHADER_MODEL);
             
                 // There can be tens/hundreds of thousands of shader variants. By default each shader will get
                 // a root variant that can be used at runtime. In order to prevent the AssetProcessor from

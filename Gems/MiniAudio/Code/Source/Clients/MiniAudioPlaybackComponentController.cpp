@@ -85,12 +85,30 @@ namespace MiniAudio
     {
         if (m_sound)
         {
-            ma_sound_start(m_sound.get());
+            m_playPending = false;
+            const auto result = ma_sound_start(m_sound.get());
+            AZ_Warning("MiniAudio", result == MA_SUCCESS, "Cannot start sound (%d)", result);
         }
+        else
+        {
+            // A request made during asynchronous loading must not be lost.
+            m_playPending = m_config.m_sound.GetId().IsValid() && !m_config.m_sound.IsError() && !m_loadFailed;
+        }
+    }
+
+    bool MiniAudioPlaybackComponentController::IsPlaying() const
+    {
+        return m_sound && ma_sound_is_playing(m_sound.get()) && !ma_sound_at_end(m_sound.get());
+    }
+
+    bool MiniAudioPlaybackComponentController::IsPlaybackPending() const
+    {
+        return m_playPending;
     }
 
     void MiniAudioPlaybackComponentController::Stop()
     {
+        m_playPending = false;
         if (m_sound)
         {
             ma_sound_stop(m_sound.get());
@@ -100,10 +118,8 @@ namespace MiniAudio
 
     void MiniAudioPlaybackComponentController::Pause()
     {
-        if (m_sound)
-        {
-            ma_sound_stop(m_sound.get());
-        }
+        m_playPending = false;
+        if (m_sound) ma_sound_stop(m_sound.get());
     }
 
     float MiniAudioPlaybackComponentController::GetVolumePercentage() const
@@ -285,17 +301,19 @@ namespace MiniAudio
 
     void MiniAudioPlaybackComponentController::OnAssetReady(AZ::Data::Asset<AZ::Data::AssetData> asset)
     {
+        if (asset.GetId() != m_config.m_sound.GetId()) return;
         AZ::Data::AssetBus::MultiHandler::BusDisconnect(asset.GetId());
-
-        // Re-assign the sound before attempting to load it if it was
-        // released and the asset is now ready.
-        // This can happen in the Editor when returning from game mode
-        if (!m_config.m_sound.IsReady())
-        {
-            m_config.m_sound = asset;
-        }
-
+        m_config.m_sound = asset;
         LoadSound();
+    }
+
+    void MiniAudioPlaybackComponentController::OnAssetError(AZ::Data::Asset<AZ::Data::AssetData> asset)
+    {
+        if (asset.GetId() != m_config.m_sound.GetId()) return;
+        AZ::Data::AssetBus::MultiHandler::BusDisconnect(asset.GetId());
+        m_playPending = false;
+        m_loadFailed = true;
+        AZ_Warning("MiniAudio", false, "Cannot load sound asset %s", asset.GetId().ToFixedString().c_str());
     }
 
     void MiniAudioPlaybackComponentController::OnWorldTransformChanged(const AZ::Transform& world)
@@ -317,6 +335,13 @@ namespace MiniAudio
 
     void MiniAudioPlaybackComponentController::OnConfigurationUpdated()
     {
+        m_loadFailed = false;
+        if (!m_config.m_sound.GetId().IsValid()) return;
+        if (m_config.m_sound.IsError())
+        {
+            OnAssetError(m_config.m_sound);
+            return;
+        }
         if (m_config.m_sound.IsReady() == false)
         {
             AZ::Data::AssetBus::MultiHandler::BusConnect(m_config.m_sound.GetId());
@@ -330,15 +355,20 @@ namespace MiniAudio
 
     void MiniAudioPlaybackComponentController::LoadSound()
     {
-        if (ma_engine* engine = MiniAudioInterface::Get()->GetSoundEngine())
+        auto* api = MiniAudioInterface::Get();
+        if (ma_engine* engine = api ? api->GetSoundEngine() : nullptr)
         {
             if (GetConfiguration().m_sound.IsReady())
             {
+                const bool startRequested = m_playPending || m_config.m_autoplayOnActivate;
+                UnloadSound();
+                m_loadFailed = true; // Cleared only after a sound initializes successfully.
                 AZ::Data::AssetId::FixedString soundName = GetConfiguration().m_sound.GetId().ToFixedString();
 
                 const auto& assetBuffer = GetConfiguration().m_sound->m_data;
                 if (assetBuffer.empty())
                 {
+                    AZ_Warning("MiniAudio", false, "Sound asset %s is empty", soundName.c_str());
                     return;
                 }
 
@@ -346,24 +376,23 @@ namespace MiniAudio
                     ma_engine_get_resource_manager(engine), soundName.c_str(), assetBuffer.data(), assetBuffer.size());
                 if (result != MA_SUCCESS)
                 {
-                    // An error occurred.
+                    AZ_Warning("MiniAudio", false, "Cannot register sound %s (%d)", soundName.c_str(), result);
                     return;
                 }
-
-                if (m_sound)
-                {
-                    ma_sound_uninit(m_sound.get());
-                    m_sound.reset();
-                }
-                m_sound = AZStd::make_unique<ma_sound>();
-
+                m_registeredSound = m_config.m_sound.GetId();
+                auto sound = AZStd::make_unique<ma_sound>();
                 const ma_uint32 flags = MA_SOUND_FLAG_DECODE;
-                result = ma_sound_init_from_file(engine, soundName.c_str(), flags, nullptr, nullptr, m_sound.get());
+                result = ma_sound_init_from_file(engine, soundName.c_str(), flags,
+                    m_config.m_presentationAudio ? nullptr : api->GetLevelSoundGroup(), nullptr, sound.get());
                 if (result != MA_SUCCESS)
                 {
-                    // An error occurred.
+                    ma_resource_manager_unregister_data(ma_engine_get_resource_manager(engine), soundName.c_str());
+                    m_registeredSound.SetInvalid();
+                    AZ_Warning("MiniAudio", false, "Cannot decode sound %s (%d)", soundName.c_str(), result);
                     return;
                 }
+                m_sound = AZStd::move(sound);
+                m_loadFailed = false;
 
                 ma_sound_set_volume(m_sound.get(), (m_config.m_volume / 100.f));
                 ma_sound_set_looping(m_sound.get(), m_config.m_loop);
@@ -414,7 +443,7 @@ namespace MiniAudio
 
                 // Automatically play after the sound loads if requested
                 // This will play automatically in Editor and Game
-                if (m_config.m_autoplayOnActivate)
+                if (startRequested)
                 {
                     Play();
                 }
@@ -424,7 +453,12 @@ namespace MiniAudio
 
     void MiniAudioPlaybackComponentController::UnloadSound()
     {
-        if (ma_engine* engine = MiniAudioInterface::Get()->GetSoundEngine())
+        m_playPending = false;
+        m_loadFailed = false;
+        m_entityMovedHandler.Disconnect();
+        AZ::Data::AssetBus::MultiHandler::BusDisconnect();
+        auto* api = MiniAudioInterface::Get();
+        if (ma_engine* engine = api ? api->GetSoundEngine() : nullptr)
         {
             if (m_sound)
             {
@@ -432,12 +466,9 @@ namespace MiniAudio
                 ma_sound_uninit(m_sound.get());
                 m_sound.reset();
             }
-
-            AZ::Data::AssetId soundId = GetConfiguration().m_sound.GetId();
-            if (soundId.IsValid())
-            {
-                ma_resource_manager_unregister_data(ma_engine_get_resource_manager(engine), soundId.ToFixedString().c_str());
-            }
+            if (m_registeredSound.IsValid())
+                ma_resource_manager_unregister_data(ma_engine_get_resource_manager(engine), m_registeredSound.ToFixedString().c_str());
         }
+        m_registeredSound.SetInvalid();
     }
 } // namespace MiniAudio

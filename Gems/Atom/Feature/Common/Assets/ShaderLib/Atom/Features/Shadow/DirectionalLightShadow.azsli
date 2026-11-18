@@ -70,6 +70,9 @@ bool DirectionalLightShadow::UseFullscreenShadows()
 DirectionalShadowCalculator DirectionalLightShadow::MakeShadowCalculator(uint lightIndex, float3 worldPos, real3 normalVector)
 {
     DirectionalShadowCalculator calc;
+#if defined(ATOM_EXPLICIT_SHADOW_GRADIENTS)
+    calc.DisableExplicitReceiverDerivatives();
+#endif
     calc.SetBlendBetweenCascadesEnable(o_blend_between_cascades_enable);
     calc.SetShadowmaps(PassSrg::m_directionalLightShadowmap, PassSrg::m_directionalLightExponentialShadowmap);
     calc.SetReceiverShadowPlaneBiasEnable(o_directional_shadow_receiver_plane_bias_enable);

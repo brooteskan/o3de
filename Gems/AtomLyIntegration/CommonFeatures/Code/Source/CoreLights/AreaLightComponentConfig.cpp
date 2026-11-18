@@ -19,13 +19,15 @@ namespace AZ
             if (auto serializeContext = azrtti_cast<AZ::SerializeContext*>(context))
             {
                 serializeContext->Class<AreaLightComponentConfig, ComponentConfig>()
-                    ->Version(10) // Added m_goboImageAsset
+                    ->Version(11)
                     ->Field("LightType", &AreaLightComponentConfig::m_lightType)
                     ->Field("Color", &AreaLightComponentConfig::m_color)
                     ->Field("IntensityMode", &AreaLightComponentConfig::m_intensityMode)
                     ->Field("Intensity", &AreaLightComponentConfig::m_intensity)
                     ->Field("AttenuationRadiusMode", &AreaLightComponentConfig::m_attenuationRadiusMode)
                     ->Field("AttenuationRadius", &AreaLightComponentConfig::m_attenuationRadius)
+                    ->Field("FalloffRate", &AreaLightComponentConfig::m_falloffRate)
+                    ->Field("LockBlenderExport", &AreaLightComponentConfig::m_lockBlenderExport)
                     ->Field("LightEmitsBothDirections", &AreaLightComponentConfig::m_lightEmitsBothDirections)
                     ->Field("UseFastApproximation", &AreaLightComponentConfig::m_useFastApproximation)
                     ->Field("GoboAsset", &AreaLightComponentConfig::m_goboImageAsset)

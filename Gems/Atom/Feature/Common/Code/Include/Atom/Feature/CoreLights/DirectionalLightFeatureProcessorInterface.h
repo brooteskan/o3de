@@ -193,6 +193,9 @@ namespace AZ
 
             //! Returns the number of directional lights
             virtual uint32_t GetLightCount() const = 0;
+
+            //! Current packed shader index, valid only until the next light removal.
+            virtual uint32_t GetShaderLightIndex(LightHandle) const { return ~uint32_t(0); }
         };
     } // namespace Render
 } // namespace AZ

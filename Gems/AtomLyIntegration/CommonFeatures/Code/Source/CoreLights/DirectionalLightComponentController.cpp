@@ -186,6 +186,7 @@ namespace AZ
             {
                 ApplyConfiguration();
             }
+            m_configurationChangedEvent.Signal();
         }
 
         const Color& DirectionalLightComponentController::GetColor() const
@@ -195,8 +196,10 @@ namespace AZ
 
         void DirectionalLightComponentController::SetColor(const Color& color)
         {
+            const bool changed = m_configuration.m_color != color;
             m_configuration.m_color = color;
             ColorIntensityChanged();
+            if (changed) m_configurationChangedEvent.Signal();
         }
 
         float DirectionalLightComponentController::GetIntensity() const
@@ -211,26 +214,32 @@ namespace AZ
 
         void DirectionalLightComponentController::SetIntensityMode(PhotometricUnit unit)
         {
+            const bool changed = m_configuration.m_intensityMode != unit;
             m_photometricValue.ConvertToPhotometricUnit(unit);
             m_configuration.m_intensityMode = unit;
             m_configuration.m_intensity = m_photometricValue.GetIntensity();
             ColorIntensityChanged();
+            if (changed) m_configurationChangedEvent.Signal();
         }
 
         void DirectionalLightComponentController::SetIntensity(float intensity, PhotometricUnit unit)
         {
+            const bool changed = m_configuration.m_intensity != intensity || m_configuration.m_intensityMode != unit;
             m_photometricValue.ConvertToPhotometricUnit(unit);
             m_photometricValue.SetIntensity(intensity);
             m_configuration.m_intensityMode = unit;
             m_configuration.m_intensity = intensity;
             ColorIntensityChanged();
+            if (changed) m_configurationChangedEvent.Signal();
         }
 
         void DirectionalLightComponentController::SetIntensity(float intensity)
         {
+            const bool changed = m_configuration.m_intensity != intensity;
             m_photometricValue.SetIntensity(intensity);
             m_configuration.m_intensity = intensity;
             ColorIntensityChanged();
+            if (changed) m_configurationChangedEvent.Signal();
         }
 
         float DirectionalLightComponentController::GetAngularDiameter() const
@@ -240,11 +249,13 @@ namespace AZ
 
         void DirectionalLightComponentController::SetAngularDiameter(float angularDiameter)
         {
+            const bool changed = m_configuration.m_angularDiameter != angularDiameter;
             m_configuration.m_angularDiameter = angularDiameter;
             if (m_featureProcessor)
             {
                 m_featureProcessor->SetAngularDiameter(m_lightHandle, m_configuration.m_angularDiameter);
             }
+            if (changed) m_configurationChangedEvent.Signal();
         }
 
         ShadowmapSize DirectionalLightComponentController::GetShadowmapSize() const
